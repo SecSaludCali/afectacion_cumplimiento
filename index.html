@@ -67,7 +67,7 @@
                     <h1 class="text-xl font-bold text-gray-900 tracking-tight">Monitor de Contingencias</h1>
                 </div>
                 <div id="nav-actions" class="hidden flex gap-4 items-center">
-                    <button onclick="volverAlInicio()" class="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors flex items-center gap-2">
+                    <button type="button" onclick="volverAlInicio()" class="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors flex items-center gap-2">
                         <i class="fas fa-home"></i> Inicio
                     </button>
                 </div>
@@ -149,6 +149,34 @@
             </div>
         </div>
 
+        <!-- Panel de Resumen (KPIs) -->
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-4" id="panel-resumen">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col justify-center items-center text-center">
+                <span class="text-xs font-bold text-gray-500 uppercase mb-1">Actividades</span>
+                <span id="kpi-actividades" class="text-2xl font-black text-gray-800">0</span>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col justify-center items-center text-center">
+                <span class="text-xs font-bold text-gray-500 uppercase mb-1">Total Tareas</span>
+                <span id="kpi-tareas" class="text-2xl font-black text-gray-800">0</span>
+            </div>
+            <div class="bg-red-50 rounded-xl shadow-sm border border-red-100 p-4 flex flex-col justify-center items-center text-center">
+                <span class="text-xs font-bold text-red-600 uppercase mb-1">Riesgo Alto</span>
+                <span id="kpi-rojo" class="text-2xl font-black text-red-700">0</span>
+            </div>
+            <div class="bg-yellow-50 rounded-xl shadow-sm border border-yellow-100 p-4 flex flex-col justify-center items-center text-center">
+                <span class="text-xs font-bold text-yellow-600 uppercase mb-1">Parcial</span>
+                <span id="kpi-amarillo" class="text-2xl font-black text-yellow-700">0</span>
+            </div>
+            <div class="bg-green-50 rounded-xl shadow-sm border border-green-100 p-4 flex flex-col justify-center items-center text-center">
+                <span class="text-xs font-bold text-green-600 uppercase mb-1">Normal</span>
+                <span id="kpi-verde" class="text-2xl font-black text-green-700">0</span>
+            </div>
+            <div class="bg-gray-50 rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col justify-center items-center text-center">
+                <span class="text-xs font-bold text-gray-500 uppercase mb-1">Otros (N/A)</span>
+                <span id="kpi-otros" class="text-2xl font-black text-gray-700">0</span>
+            </div>
+        </div>
+
         <!-- Herramientas: Buscador y Filtros -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sticky top-16 z-40 flex flex-col md:flex-row gap-4 justify-between items-center">
             
@@ -163,21 +191,21 @@
             <!-- Filtros por Color (Semáforo Tarea) -->
             <div class="flex flex-wrap items-center gap-2">
                 <span class="text-xs font-semibold text-gray-500 mr-2 uppercase tracking-wide">Filtros Rápidos:</span>
-                <button onclick="filtrarPorColor('todos')" id="btn-filtro-todos" class="filtro-btn active px-3 py-1.5 rounded-full text-xs font-bold border border-gray-300 bg-gray-800 text-white shadow-sm transition-all hover:bg-gray-700">Todos</button>
+                <button type="button" onclick="filtrarPorColor('todos')" id="btn-filtro-todos" class="filtro-btn active px-3 py-1.5 rounded-full text-xs font-bold border border-gray-300 bg-gray-800 text-white shadow-sm transition-all hover:bg-gray-700">Todos</button>
                 
-                <button onclick="filtrarPorColor('rojo')" id="btn-filtro-rojo" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-red-200 bg-white text-red-700 shadow-sm transition-all hover:bg-red-50 flex items-center gap-1">
+                <button type="button" onclick="filtrarPorColor('rojo')" id="btn-filtro-rojo" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-red-200 bg-white text-red-700 shadow-sm transition-all hover:bg-red-50 flex items-center gap-1">
                     <span class="w-2 h-2 rounded-full bg-semaforo-rojo inline-block"></span> Riesgo Alto
                 </button>
                 
-                <button onclick="filtrarPorColor('amarillo')" id="btn-filtro-amarillo" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-yellow-300 bg-white text-yellow-700 shadow-sm transition-all hover:bg-yellow-50 flex items-center gap-1">
+                <button type="button" onclick="filtrarPorColor('amarillo')" id="btn-filtro-amarillo" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-yellow-300 bg-white text-yellow-700 shadow-sm transition-all hover:bg-yellow-50 flex items-center gap-1">
                     <span class="w-2 h-2 rounded-full bg-semaforo-amarillo inline-block"></span> Parcial
                 </button>
                 
-                <button onclick="filtrarPorColor('verde')" id="btn-filtro-verde" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-green-300 bg-white text-green-700 shadow-sm transition-all hover:bg-green-50 flex items-center gap-1">
+                <button type="button" onclick="filtrarPorColor('verde')" id="btn-filtro-verde" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-green-300 bg-white text-green-700 shadow-sm transition-all hover:bg-green-50 flex items-center gap-1">
                     <span class="w-2 h-2 rounded-full bg-semaforo-verde inline-block"></span> Normal
                 </button>
 
-                <button onclick="filtrarPorColor('otros')" id="btn-filtro-otros" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-gray-300 bg-white text-gray-600 shadow-sm transition-all hover:bg-gray-50 flex items-center gap-1" title="Morado (No aplica) o Cian (Sobre-ejecución)">
+                <button type="button" onclick="filtrarPorColor('otros')" id="btn-filtro-otros" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-gray-300 bg-white text-gray-600 shadow-sm transition-all hover:bg-gray-50 flex items-center gap-1" title="Morado (No aplica) o Cian (Sobre-ejecución)">
                     <span class="w-2 h-2 rounded-full bg-semaforo-morado inline-block"></span> / <span class="w-2 h-2 rounded-full bg-semaforo-cian inline-block"></span> Otros
                 </button>
             </div>
@@ -390,6 +418,9 @@
             filtroActual = 'todos';
             actualizarBotonesFiltro();
             document.getElementById('buscador').value = '';
+            
+            calcularKPIs(); 
+            
             renderizarJerarquia();
         }
 
@@ -399,9 +430,63 @@
             document.getElementById('pantalla-inicio').classList.remove('hidden');
         }
 
+        // Función para calcular los resumenes estadísticos
+        function calcularKPIs() {
+            let totalActividades = datosActivos.length;
+            let totalTareas = 0;
+            let conteoRojo = 0;
+            let conteoAmarillo = 0;
+            let conteoVerde = 0;
+            let conteoOtros = 0;
+
+            datosActivos.forEach(actividad => {
+                totalTareas += actividad.tareas.length;
+                actividad.tareas.forEach(tarea => {
+                    const infoSemaforo = clasificarSemaforoTarea(tarea.afectacionTarea);
+                    if (infoSemaforo.categoria === 'rojo') conteoRojo++;
+                    else if (infoSemaforo.categoria === 'amarillo') conteoAmarillo++;
+                    else if (infoSemaforo.categoria === 'verde') conteoVerde++;
+                    else conteoOtros++;
+                });
+            });
+
+            // Animación de los números para que se vea más fluido
+            animarNumero('kpi-actividades', totalActividades);
+            animarNumero('kpi-tareas', totalTareas);
+            animarNumero('kpi-rojo', conteoRojo);
+            animarNumero('kpi-amarillo', conteoAmarillo);
+            animarNumero('kpi-verde', conteoVerde);
+            animarNumero('kpi-otros', conteoOtros);
+        }
+
+        // Función auxiliar para animar el conteo de los números
+        function animarNumero(id, valorFinal) {
+            const elemento = document.getElementById(id);
+            let valorActual = 0;
+            const duracion = 500; // medio segundo
+            const pasos = 20;
+            const incremento = valorFinal / pasos;
+            const tiempoPaso = duracion / pasos;
+            
+            if(valorFinal === 0) {
+                elemento.textContent = '0';
+                return;
+            }
+
+            const intervalo = setInterval(() => {
+                valorActual += incremento;
+                if (valorActual >= valorFinal) {
+                    elemento.textContent = valorFinal;
+                    clearInterval(intervalo);
+                } else {
+                    elemento.textContent = Math.floor(valorActual);
+                }
+            }, tiempoPaso);
+        }
+
         // 5. DISEÑO UX: Funciones de Color para Semáforos
         function clasificarSemaforoTarea(texto) {
-            const t = texto.toLowerCase();
+            const t = (texto || '').toLowerCase();
             if (t.includes("sin afectación")) return { color: 'bg-semaforo-verde text-white', label: 'Normal', categoria: 'verde' };
             if (t.includes("afectación parcial")) return { color: 'bg-semaforo-amarillo text-black', label: 'Parcial', categoria: 'amarillo' };
             if (t.includes("afectación alta")) return { color: 'bg-semaforo-rojo text-white', label: 'Riesgo Alto', categoria: 'rojo' };
@@ -410,8 +495,8 @@
             return { color: 'bg-gray-200 text-gray-700', label: 'Sin Datos', categoria: 'todos' };
         }
 
-        function getColorBinario(texto, tipo) {
-            const t = texto.toLowerCase();
+        function getColorBinario(texto) {
+            const t = (texto || '').toLowerCase();
             if (t.includes("no afecta")) return 'bg-green-100 text-green-700 border-green-200';
             if (t.includes("si afecta") || t.includes("sí afecta")) return 'bg-red-100 text-red-700 border-red-200';
             return 'bg-gray-100 text-gray-600 border-gray-200';
