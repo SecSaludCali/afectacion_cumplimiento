@@ -317,7 +317,14 @@
             for (let i = 0; i < Math.min(20, data.length); i++) {
                 const row = data[i];
                 
-                if (row.some(cell => typeof cell === 'string' && (cell.includes('TAREA') || cell.includes('ACTIVIDAD')))) {
+                // Buscamos una fila que tenga al menos dos de estas palabras clave para asegurarnos que es la cabecera
+                let matchCount = 0;
+                if (row.some(cell => typeof cell === 'string' && cell.trim() === '1. ACTIVIDAD')) matchCount++;
+                if (row.some(cell => typeof cell === 'string' && cell.trim() === '2. TAREA')) matchCount++;
+                if (row.some(cell => typeof cell === 'string' && cell.includes('3. CANTIDAD PROGRAMADA'))) matchCount++;
+                if (row.some(cell => typeof cell === 'string' && cell.includes('4. NIVEL DE AFECTACIÓN'))) matchCount++;
+
+                if (matchCount >= 2) {
                     headerRowIndex = i;
                 }
 
@@ -335,7 +342,7 @@
 
             if (headerRowIndex === -1) {
                 showLoading(false);
-                alert("No se pudo identificar la tabla de datos principal. Asegúrate de que existe una columna 'TAREA' o 'ACTIVIDAD'.");
+                alert("No se pudo identificar la tabla de datos principal. Asegúrate de que los encabezados sigan el formato numérico (e.g., '1. ACTIVIDAD', '2. TAREA').");
                 return;
             }
 
@@ -347,30 +354,41 @@
             // 2. Procesar Filas de Tareas
             const headers = data[headerRowIndex].map(h => typeof h === 'string' ? h.trim().toUpperCase() : '');
             
-            // Identificar índices clave basándonos en nombres probables
-            const idxActividad = Math.max(headers.findIndex(h => h.includes('ACTIVIDAD')), 0);
-            const idxTarea = Math.max(headers.findIndex(h => h.includes('TAREA')), 1);
+            // Buscar explícitamente "2. TAREA"
+            let idxTarea = headers.findIndex(h => h.trim() === '2. TAREA');
+            if (idxTarea === -1) idxTarea = headers.findIndex(h => h.includes('TAREA') && !h.includes('AFECTACIÓN'));
+            if (idxTarea === -1) idxTarea = 1; // Fallback
+
+            let idxActividad = headers.findIndex(h => h.trim() === '1. ACTIVIDAD');
+            if (idxActividad === -1) idxActividad = headers.findIndex(h => h.includes('ACTIVIDAD'));
+            if (idxActividad === -1) idxActividad = 0; // Fallback
             
             // Índices para Cantidades (Búsqueda aproximada)
             const idxCantQ3 = headers.findIndex(h => h.includes('CANTIDAD') && (h.includes('III') || h.includes('3')));
             const idxCantQ4 = headers.findIndex(h => h.includes('CANTIDAD') && (h.includes('IV') || h.includes('4')));
             
-            let idxSemaforo1 = headers.findIndex(h => h.includes('NIVEL DE AFECTACIÓN') && !h.includes('INDICADORES'));
-            if(idxSemaforo1 === -1) idxSemaforo1 = 4;
+            let idxSemaforo1 = headers.findIndex(h => h.includes('4. NIVEL DE AFECTACIÓN'));
+            if(idxSemaforo1 === -1) idxSemaforo1 = headers.findIndex(h => h.includes('NIVEL DE AFECTACIÓN') && !h.includes('INDICADORES'));
+            if(idxSemaforo1 === -1) idxSemaforo1 = 4; // Fallback
             
-            let idxSemaforo2 = headers.findIndex(h => h.includes('META'));
+            let idxSemaforo2 = headers.findIndex(h => h.includes('5. AFECTACIÓN'));
+            if(idxSemaforo2 === -1) idxSemaforo2 = headers.findIndex(h => h.includes('META'));
             if(idxSemaforo2 === -1) idxSemaforo2 = 5;
             
-            let idxSemaforo3 = headers.findIndex(h => h.includes('INDICADORES'));
+            let idxSemaforo3 = headers.findIndex(h => h.includes('6. AFECTACIÓN'));
+            if(idxSemaforo3 === -1) idxSemaforo3 = headers.findIndex(h => h.includes('INDICADORES'));
             if(idxSemaforo3 === -1) idxSemaforo3 = 6;
 
-            let idxJustificacion = headers.findIndex(h => h.includes('JUSTIFICACIÓN'));
+            let idxJustificacion = headers.findIndex(h => h.includes('7. JUSTIFICACIÓN'));
+            if(idxJustificacion === -1) idxJustificacion = headers.findIndex(h => h.includes('JUSTIFICACIÓN'));
             if(idxJustificacion === -1) idxJustificacion = 8;
 
-            let idxAcciones = headers.findIndex(h => h.includes('ACCIONES EJECUTADAS'));
+            let idxAcciones = headers.findIndex(h => h.includes('8. ACCIONES'));
+            if(idxAcciones === -1) idxAcciones = headers.findIndex(h => h.includes('ACCIONES EJECUTADAS'));
             if(idxAcciones === -1) idxAcciones = 9;
 
-            let idxContingencia = headers.findIndex(h => h.includes('PLAN DE CONTINGENCIA'));
+            let idxContingencia = headers.findIndex(h => h.includes('9. PLAN DE CONTINGENCIA'));
+            if(idxContingencia === -1) idxContingencia = headers.findIndex(h => h.includes('PLAN DE CONTINGENCIA'));
             if(idxContingencia === -1) idxContingencia = 10;
 
             parsedTasks = [];
@@ -384,6 +402,9 @@
                 const tarea = row[idxTarea] || '';
                 const afect = row[idxSemaforo1] || '';
                 
+                // Evitamos procesar filas que parecen ser sub-encabezados largos
+                if (tarea.includes('NIVEL DE AFECTACIÓN (SEMÁFORO DESPLEGABLE)')) return;
+
                 // Si hay tarea pero no afectación, o viceversa, la registramos igual si parece válida
                 if(tarea.trim() === '' && afect.trim() === '') return;
 
