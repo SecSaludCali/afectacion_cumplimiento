@@ -208,46 +208,16 @@
             <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 
                 <!-- Columna Izquierda: Gráficos y Filtros -->
-                <div class="xl:col-span-1 space-y-6">
-                    
-                    <!-- Gráfico: Estado de Tareas -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-                        <h3 class="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wider">Estado Global de Tareas</h3>
-                        <div class="relative h-48 w-full flex justify-center">
-                            <canvas id="chartAfectacion"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Filtros de Navegación -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 sticky top-24">
-                        <h3 class="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wider">Filtros Rápidos</h3>
-                        <div class="space-y-2">
-                            <button onclick="applyFilter('all')" class="w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors bg-blue-50 text-blue-700 border border-blue-100" id="btn-filter-all">
-                                <i class="fas fa-layer-group w-5"></i> Ver Todo
-                            </button>
-                            <button onclick="applyFilter('afectacion-alta')" class="w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-gray-50 text-gray-600" id="btn-filter-alta">
-                                <i class="fas fa-circle text-semaforo-rojo w-5"></i> Solo Afectación Alta
-                            </button>
-                            <button onclick="applyFilter('afectacion-parcial')" class="w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-gray-50 text-gray-600" id="btn-filter-parcial">
-                                <i class="fas fa-circle text-yellow-400 w-5"></i> Afectación Parcial
-                            </button>
-                            <button onclick="applyFilter('metas-afectadas')" class="w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-gray-50 text-gray-600" id="btn-filter-metas">
-                                <i class="fas fa-bullseye text-red-500 w-5"></i> Afectan Metas de Proyecto
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Columna Derecha: Tarjetas de Tareas -->
+                <!-- Columna Derecha: Tarjetas de Tareas Agrupadas -->
                 <div class="xl:col-span-2">
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-4 flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-gray-900">Listado de Tareas Evaluadas</h3>
-                        <span id="tareasCount" class="bg-gray-100 text-gray-600 py-1 px-3 rounded-full text-xs font-semibold">0 tareas mostradas</span>
+                        <h3 class="text-lg font-bold text-gray-900">Actividades y Tareas Evaluadas</h3>
+                        <span id="tareasCount" class="bg-blue-100 text-blue-800 py-1 px-3 rounded-full text-xs font-bold">0 Tareas filtradas</span>
                     </div>
 
-                    <!-- Contenedor de Tarjetas -->
+                    <!-- Contenedor de Actividades (Acordeones) -->
                     <div id="cardsContainer" class="space-y-4">
-                        <!-- Las tarjetas se inyectan dinámicamente aquí mediante JS -->
+                        <!-- Las actividades se inyectan dinámicamente aquí mediante JS -->
                     </div>
                 </div>
             </div>
@@ -258,6 +228,7 @@
         // Variables Globales
         let rawData = [];
         let parsedTasks = [];
+        let groupedData = {}; // Nueva variable para agrupar por actividad
         let currentFilter = 'all';
         let chartInstance = null;
 
@@ -323,12 +294,10 @@
             for (let i = 0; i < Math.min(20, data.length); i++) {
                 const row = data[i];
                 
-                // Buscar cabecera de tabla
                 if (row.some(cell => typeof cell === 'string' && (cell.includes('TAREA') || cell.includes('ACTIVIDAD')))) {
                     headerRowIndex = i;
                 }
 
-                // Extraer metadatos basándonos en tu estructura
                 row.forEach((cell, idx) => {
                     if (typeof cell === 'string') {
                         if (cell.includes('NOMBRE DEL PROYECTO:')) metadata.proyecto = row[idx + 1] || 'No definido';
@@ -347,22 +316,24 @@
                 return;
             }
 
-            // Actualizar UI con metadatos
             document.getElementById('metaProyecto').textContent = metadata.proyecto || 'Proyecto sin nombre';
             document.getElementById('metaSubsecretaria').innerHTML = `<i class="fas fa-sitemap"></i> ${metadata.subsecretaria || 'Dependencia no especificada'}`;
             document.getElementById('metaEmergencia').textContent = metadata.emergencia || '--';
             document.getElementById('metaFecha').textContent = metadata.fecha || '--';
 
             // 2. Procesar Filas de Tareas
-            const headers = data[headerRowIndex].map(h => typeof h === 'string' ? h.trim() : '');
+            const headers = data[headerRowIndex].map(h => typeof h === 'string' ? h.trim().toUpperCase() : '');
             
-            // Identificar índices clave
+            // Identificar índices clave basándonos en nombres probables
             const idxActividad = Math.max(headers.findIndex(h => h.includes('ACTIVIDAD')), 0);
             const idxTarea = Math.max(headers.findIndex(h => h.includes('TAREA')), 1);
             
-            // Buscar columnas de semáforos por texto o asumir posiciones si falla
+            // Índices para Cantidades (Búsqueda aproximada)
+            const idxCantQ3 = headers.findIndex(h => h.includes('CANTIDAD') && (h.includes('III') || h.includes('3')));
+            const idxCantQ4 = headers.findIndex(h => h.includes('CANTIDAD') && (h.includes('IV') || h.includes('4')));
+            
             let idxSemaforo1 = headers.findIndex(h => h.includes('NIVEL DE AFECTACIÓN') && !h.includes('INDICADORES'));
-            if(idxSemaforo1 === -1) idxSemaforo1 = 4; // Fallback
+            if(idxSemaforo1 === -1) idxSemaforo1 = 4;
             
             let idxSemaforo2 = headers.findIndex(h => h.includes('META'));
             if(idxSemaforo2 === -1) idxSemaforo2 = 5;
@@ -379,23 +350,31 @@
             let idxContingencia = headers.findIndex(h => h.includes('PLAN DE CONTINGENCIA'));
             if(idxContingencia === -1) idxContingencia = 10;
 
-            // Filtrar filas de datos reales
             parsedTasks = [];
+            let lastActividad = "Actividad General"; // Para arrastrar el nombre de la actividad si la celda está vacía
+
             const dataRows = data.slice(headerRowIndex + 1);
             
             dataRows.forEach((row, i) => {
-                // Ignorar filas totalmente vacías
                 if (!row.some(cell => typeof cell === 'string' && cell.trim() !== '')) return;
                 
-                // Asegurarse de que al menos haya una tarea o afectación registrada
                 const tarea = row[idxTarea] || '';
                 const afect = row[idxSemaforo1] || '';
-                if(tarea === '' && afect === '') return;
+                
+                // Si hay tarea pero no afectación, o viceversa, la registramos igual si parece válida
+                if(tarea.trim() === '' && afect.trim() === '') return;
+
+                // Si la celda de actividad tiene texto, la actualizamos. Si está vacía, asume la última conocida (común en Sheets combinados)
+                if (row[idxActividad] && row[idxActividad].trim() !== '') {
+                    lastActividad = row[idxActividad].trim();
+                }
 
                 parsedTasks.push({
                     id: i,
-                    actividad: row[idxActividad] || 'Actividad General',
+                    actividad: lastActividad,
                     tarea: tarea,
+                    cantQ3: idxCantQ3 !== -1 ? (row[idxCantQ3] || 'N/A') : 'N/A',
+                    cantQ4: idxCantQ4 !== -1 ? (row[idxCantQ4] || 'N/A') : 'N/A',
                     afectacionTarea: afect,
                     afectacionMeta: row[idxSemaforo2] || '',
                     afectacionIndicador: row[idxSemaforo3] || '',
@@ -412,103 +391,33 @@
             updateDashboard();
         }
 
-        // Helpers para colores basados en los textos de tu matriz
         function getBadgeInfo(text, type) {
             const t = (text || '').toLowerCase();
-            if (!t) return { color: 'bg-gray-100 text-gray-600', icon: 'fa-minus', text: 'No Evaluado' };
+            if (!t) return { color: 'bg-gray-100 text-gray-500 border-gray-200', icon: 'fa-minus', text: 'No Evaluado' };
 
             if (type === 'tarea') {
-                if (t.includes('sin afectación')) return { color: 'bg-semaforo-verde text-white', icon: 'fa-check-circle', text: text };
-                if (t.includes('afectación parcial')) return { color: 'bg-semaforo-amarillo text-black', icon: 'fa-exclamation-circle', text: text };
-                if (t.includes('afectación alta')) return { color: 'bg-semaforo-rojo text-white', icon: 'fa-times-circle', text: text };
-                if (t.includes('no aplica')) return { color: 'bg-semaforo-morado text-white', icon: 'fa-ban', text: text };
-                if (t.includes('sobre-ejecución') || t.includes('sobre ejecución')) return { color: 'bg-semaforo-cian text-black', icon: 'fa-arrow-up', text: text };
+                if (t.includes('sin afectación')) return { color: 'bg-green-100 text-green-800 border-green-200', icon: 'fa-check-circle', text: text };
+                if (t.includes('afectación parcial')) return { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: 'fa-exclamation-circle', text: text };
+                if (t.includes('afectación alta')) return { color: 'bg-red-100 text-red-800 border-red-200', icon: 'fa-times-circle', text: text };
+                if (t.includes('no aplica')) return { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: 'fa-ban', text: text };
+                if (t.includes('sobre-ejecución') || t.includes('sobre ejecución')) return { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: 'fa-arrow-up', text: text };
             } 
             else if (type === 'meta' || type === 'indicador') {
-                if (t.includes('no afecta')) return { color: 'bg-semaforo-meta-verde text-white', icon: 'fa-check', text: text };
-                if (t.includes('si afecta') || t.includes('sí afecta')) return { color: 'bg-semaforo-rojo text-white', icon: 'fa-exclamation-triangle', text: text };
+                if (t.includes('no afecta')) return { color: 'bg-green-50 text-green-700 border-green-200', icon: 'fa-check', text: text };
+                if (t.includes('si afecta') || t.includes('sí afecta')) return { color: 'bg-red-50 text-red-700 border-red-200', icon: 'fa-exclamation-triangle', text: text };
             }
-            return { color: 'bg-gray-100 text-gray-800', icon: 'fa-info-circle', text: text };
+            return { color: 'bg-gray-100 text-gray-700 border-gray-200', icon: 'fa-info-circle', text: text };
         }
 
-        function updateDashboard() {
-            // Calcular KPIs
-            const total = parsedTasks.length;
-            const altas = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta')).length;
-            const metasAfec = parsedTasks.filter(t => (t.afectacionMeta || '').toLowerCase().includes('si afecta')).length;
-            const indAfec = parsedTasks.filter(t => (t.afectacionIndicador || '').toLowerCase().includes('si afecta')).length;
-
-            document.getElementById('kpiTotal').textContent = total;
-            document.getElementById('kpiAfectacionAlta').textContent = altas;
-            document.getElementById('kpiMetasAfectadas').textContent = metasAfec;
-            document.getElementById('kpiIndicadoresAfectados').textContent = indAfec;
-
-            updateChart();
-            renderCards();
+                // Extraer metadatos basándonos en tu estructura
+        function toggleActivity(id) {
+            const content = document.getElementById(`act-content-${id}`);
+            const icon = document.getElementById(`act-icon-${id}`);
+            content.classList.toggle('hidden');
+            icon.classList.toggle('rotate-180');
         }
 
-        function updateChart() {
-            const ctx = document.getElementById('chartAfectacion').getContext('2d');
-            
-            const counts = {
-                'Sin Afectación': 0, 'Parcial': 0, 'Alta': 0, 'No Aplica': 0, 'Sobre-ejecución': 0
-            };
-
-            parsedTasks.forEach(t => {
-                const val = (t.afectacionTarea || '').toLowerCase();
-                if(val.includes('sin afectación')) counts['Sin Afectación']++;
-                else if(val.includes('parcial')) counts['Parcial']++;
-                else if(val.includes('alta')) counts['Alta']++;
-                else if(val.includes('no aplica')) counts['No Aplica']++;
-                else if(val.includes('sobre')) counts['Sobre-ejecución']++;
-            });
-
-            if(chartInstance) chartInstance.destroy();
-
-            chartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(counts),
-                    datasets: [{
-                        data: Object.values(counts),
-                        backgroundColor: ['#00b050', '#ffff00', '#c00000', '#7030a0', '#00d2ff'],
-                        borderWidth: 2,
-                        borderColor: '#ffffff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }
-                    },
-                    cutout: '65%'
-                }
-            });
-        }
-
-        function applyFilter(filterType) {
-            currentFilter = filterType;
-            
-            // Resetear estilos de botones
-            const buttons = ['all', 'alta', 'parcial', 'metas'];
-            buttons.forEach(b => {
-                const btn = document.getElementById(`btn-filter-${b}`);
-                btn.className = "w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-gray-50 text-gray-600";
-            });
-
-            // Estilo activo
-            const activeBtn = document.getElementById(`btn-filter-${filterType.split('-')[0] === 'afectacion' ? filterType.split('-')[1] : filterType.split('-')[0]}`);
-            if(activeBtn) {
-                activeBtn.className = "w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors bg-blue-50 text-blue-700 border border-blue-100";
-            } else if (filterType === 'all') {
-                 document.getElementById(`btn-filter-all`).className = "w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors bg-blue-50 text-blue-700 border border-blue-100";
-            }
-
-            renderCards();
-        }
-
-        function toggleCard(id) {
+        function toggleTask(id) {
             const content = document.getElementById(`content-${id}`);
             const icon = document.getElementById(`icon-${id}`);
             content.classList.toggle('open');
@@ -519,21 +428,21 @@
             const container = document.getElementById('cardsContainer');
             container.innerHTML = '';
 
-            // Filtrar datos
-            let filteredData = parsedTasks;
+            // 1. Filtrar los datos planos
+            let filteredTasks = parsedTasks;
             if (currentFilter === 'afectacion-alta') {
-                filteredData = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta'));
+                filteredTasks = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta'));
             } else if (currentFilter === 'afectacion-parcial') {
-                filteredData = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('parcial'));
+                filteredTasks = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('parcial'));
             } else if (currentFilter === 'metas-afectadas') {
-                filteredData = parsedTasks.filter(t => (t.afectacionMeta || '').toLowerCase().includes('si afecta'));
+                filteredTasks = parsedTasks.filter(t => (t.afectacionMeta || '').toLowerCase().includes('si afecta'));
             }
 
-            document.getElementById('tareasCount').textContent = `${filteredData.length} tareas mostradas`;
+            document.getElementById('tareasCount').textContent = `${filteredTasks.length} tareas en esta vista`;
 
-            if (filteredData.length === 0) {
+            if (filteredTasks.length === 0) {
                 container.innerHTML = `
-                    <div class="text-center py-10 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                    <div class="text-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
                         <i class="fas fa-search text-3xl text-gray-300 mb-3"></i>
                         <p class="text-gray-500">No hay tareas que coincidan con este filtro.</p>
                     </div>
@@ -541,62 +450,126 @@
                 return;
             }
 
-            filteredData.forEach(task => {
-                const infoTarea = getBadgeInfo(task.afectacionTarea, 'tarea');
-                const infoMeta = getBadgeInfo(task.afectacionMeta, 'meta');
-                const infoInd = getBadgeInfo(task.afectacionIndicador, 'indicador');
+            // 2. Agrupar las tareas filtradas por Actividad
+            groupedData = {};
+            filteredTasks.forEach(task => {
+                if(!groupedData[task.actividad]) {
+                    groupedData[task.actividad] = [];
+                }
+                groupedData[task.actividad].push(task);
+            });
 
-                // Card HTML
-                const card = document.createElement('div');
-                card.className = "bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow";
+            // 3. Renderizar Jerárquicamente
+            let actIndex = 0;
+            for (const [actividadNombre, tareas] of Object.entries(groupedData)) {
+                actIndex++;
                 
-                card.innerHTML = `
-                    <!-- Cabecera de la tarjeta (Siempre visible) -->
-                    <div class="p-5 cursor-pointer flex flex-col md:flex-row md:items-start justify-between gap-4" onclick="toggleCard(${task.id})">
-                        <div class="flex-grow">
-                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">${task.actividad}</span>
-                            <h4 class="text-base font-semibold text-gray-900 leading-snug">${task.tarea}</h4>
-                            
-                            <!-- Badges (Semáforos) inline -->
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${infoTarea.color}">
-                                    <i class="fas ${infoTarea.icon}"></i> Tarea: ${infoTarea.text.split(':')[0]} <!-- Mostramos solo la primera parte para que sea corto -->
-                                </span>
-                                ${(infoMeta.text && infoMeta.text.toLowerCase().includes('afecta')) ? 
-                                    `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${infoMeta.color} opacity-90 border border-black/10">
-                                        <i class="fas ${infoMeta.icon}"></i> Meta
-                                    </span>` : ''}
-                                ${(infoInd.text && infoInd.text.toLowerCase().includes('afecta')) ? 
-                                    `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${infoInd.color} opacity-90 border border-black/10">
-                                        <i class="fas ${infoInd.icon}"></i> Indicador
-                                    </span>` : ''}
+                // Calcular resumen de la actividad para el encabezado
+                const numAlta = tareas.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta')).length;
+                let badgeAlert = '';
+                if(numAlta > 0) {
+                    badgeAlert = `<span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full"><i class="fas fa-exclamation-circle"></i> ${numAlta} en riesgo</span>`;
+                }
+
+                // Crear Acordeón de Actividad
+                const actCard = document.createElement('div');
+                actCard.className = "bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden";
+                
+                let tareasHTML = '';
+                
+                // Renderizar Tareas dentro de la Actividad
+                tareas.forEach(task => {
+                    const infoTarea = getBadgeInfo(task.afectacionTarea, 'tarea');
+                    const infoMeta = getBadgeInfo(task.afectacionMeta, 'meta');
+                    const infoInd = getBadgeInfo(task.afectacionIndicador, 'indicador');
+
+                    tareasHTML += `
+                        <div class="border-t border-gray-100 hover:bg-gray-50/50 transition-colors">
+                            <div class="p-4 pl-6 cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4" onclick="toggleTask(${task.id})">
+                                <!-- Info Principal de Tarea -->
+                                <div class="flex-grow max-w-3xl">
+                                    <div class="flex items-center gap-3 mb-1">
+                                        <span class="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">TAREA</span>
+                                    </div>
+                                    <h4 class="text-sm font-semibold text-gray-900 leading-snug">${task.tarea || '<i>(Tarea sin descripción)</i>'}</h4>
+                                    
+                                    <!-- Semáforos Inline -->
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold border ${infoTarea.color}">
+                                            <i class="fas ${infoTarea.icon}"></i> ${infoTarea.text.split(':')[0]}
+                                        </span>
+                                        ${(infoMeta.text && infoMeta.text.toLowerCase().includes('afecta')) ? 
+                                            `<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold border ${infoMeta.color}">
+                                                <i class="fas ${infoMeta.icon}"></i> Meta afectada
+                                            </span>` : ''}
+                                        ${(infoInd.text && infoInd.text.toLowerCase().includes('afecta')) ? 
+                                            `<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold border ${infoInd.color}">
+                                                <i class="fas ${infoInd.icon}"></i> Ind. afectado
+                                            </span>` : ''}
+                                    </div>
+                                </div>
+
+                                <!-- Cantidades Programadas -->
+                                <div class="flex flex-row lg:flex-col gap-2 lg:gap-1 shrink-0 bg-blue-50/50 p-2 rounded border border-blue-100/50">
+                                    <div class="text-[11px]">
+                                        <span class="text-gray-500 font-medium">Prog. III Tri:</span> 
+                                        <span class="font-bold text-gray-800">${task.cantQ3}</span>
+                                    </div>
+                                    <div class="text-[11px]">
+                                        <span class="text-gray-500 font-medium">Prog. IV Tri:</span> 
+                                        <span class="font-bold text-gray-800">${task.cantQ4}</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="text-gray-400 shrink-0 self-end lg:self-center">
+                                    <i class="fas fa-chevron-down icon-transition" id="icon-${task.id}"></i>
+                                </div>
+                            </div>
+
+                            <!-- Detalles Expandibles (Textos Largos) -->
+                            <div id="content-${task.id}" class="card-details bg-white">
+                                <div class="p-4 pl-6 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm border-t border-dashed border-gray-200 mx-4">
+                                    <div>
+                                        <h5 class="font-bold text-gray-700 mb-1 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-comment-alt text-gray-400"></i> Justificación</h5>
+                                        <p class="text-gray-600 leading-relaxed text-xs">${task.justificacion}</p>
+                                    </div>
+                                    <div>
+                                        <h5 class="font-bold text-gray-700 mb-1 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-tools text-gray-400"></i> Acciones Ejecutadas</h5>
+                                        <p class="text-gray-600 leading-relaxed text-xs">${task.acciones}</p>
+                                    </div>
+                                    <div>
+                                        <h5 class="font-bold text-gray-700 mb-1 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-map-signs text-gray-400"></i> Plan Contingencia</h5>
+                                        <p class="text-gray-600 leading-relaxed text-xs">${task.contingencia}</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="text-gray-400 shrink-0 self-center md:self-start pt-2">
-                            <i class="fas fa-chevron-down icon-transition" id="icon-${task.id}"></i>
+                    `;
+                });
+
+                actCard.innerHTML = `
+                    <div class="bg-gray-50 p-4 border-b border-gray-200 cursor-pointer flex justify-between items-center hover:bg-gray-100 transition-colors" onclick="toggleActivity(${actIndex})">
+                        <div class="pr-4">
+                            <span class="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest mb-1 block">ACTIVIDAD</span>
+                            <h3 class="text-base font-bold text-gray-900 leading-tight">${actividadNombre}</h3>
+                            <div class="mt-2 flex gap-2">
+                                <span class="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded">${tareas.length} Tareas</span>
+                                ${badgeAlert}
+                            </div>
+                        </div>
+                        <div class="text-gray-500 bg-white p-2 rounded-full shadow-sm">
+                            <i class="fas fa-chevron-down icon-transition" id="act-icon-${actIndex}"></i>
                         </div>
                     </div>
-
-                    <!-- Cuerpo Expandible (Detalles textuales) -->
-                    <div id="content-${task.id}" class="card-details bg-gray-50 border-t border-gray-100">
-                        <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                            <div>
-                                <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-2"><i class="fas fa-comment-alt text-gray-400"></i> Justificación</h5>
-                                <p class="text-gray-600 whitespace-pre-wrap leading-relaxed">${task.justificacion}</p>
-                            </div>
-                            <div>
-                                <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-2"><i class="fas fa-tools text-gray-400"></i> Acciones Ejecutadas</h5>
-                                <p class="text-gray-600 whitespace-pre-wrap leading-relaxed">${task.acciones}</p>
-                            </div>
-                            <div>
-                                <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-2"><i class="fas fa-map-signs text-gray-400"></i> Plan Contingencia</h5>
-                                <p class="text-gray-600 whitespace-pre-wrap leading-relaxed">${task.contingencia}</p>
-                            </div>
-                        </div>
+                    
+                    <!-- Contenedor de Tareas (Abierto por defecto) -->
+                    <div id="act-content-${actIndex}" class="block">
+                        ${tareasHTML}
                     </div>
                 `;
-                container.appendChild(card);
-            });
+                
+                container.appendChild(actCard);
+            }
         }
     </script>
 </body>
