@@ -244,28 +244,51 @@
             let metadatos = {};
             let filaInicioTabla = -1;
 
-            // A. Extraer Metadatos (Generalmente en las primeras 10 filas)
+            // A. Extraer Metadatos (Generalmente en las primeras 15 filas)
             for (let i = 0; i < Math.min(15, filas.length); i++) {
                 const fila = filas[i];
                 
-                // Buscar dónde empiezan los encabezados de la tabla (las 13 columnas)
+                // Buscar dónde empiezan los encabezados de la tabla
                 const textoFila = fila.join("").toUpperCase();
-                if (textoFila.includes("ACTIVIDAD") && textoFila.includes("TAREA") && textoFila.includes("CANTIDAD PROGRAMADA")) {
+                if (textoFila.includes("ACTIVIDAD") && textoFila.includes("TAREA")) {
                     filaInicioTabla = i;
-                    break;
                 }
 
-                // Extraer pares clave-valor
+                // Extraer pares clave-valor de forma más flexible
                 fila.forEach((celda, idx) => {
                     if (typeof celda === 'string' && celda.trim() !== '') {
-                        let clave = celda.toUpperCase().trim();
-                        if (clave.includes('GRUPO:')) metadatos['Grupo'] = fila[idx+1] || '--';
-                        if (clave.includes('RESPONSABLE DEL PROYECTO:')) metadatos['Responsable'] = fila[idx+1] || '--';
-                        if (clave.includes('NOMBRE DEL PROYECTO:')) metadatos['Proyecto'] = fila[idx+1] || '--';
-                        if (clave.includes('EMERGENCIA:')) metadatos['Emergencia'] = fila[idx+1] || '--';
-                        if (clave.includes('FECHA DE DILIGENCIAMIENTO:')) metadatos['Fecha'] = fila[idx+1] || '--';
+                        let celdaUpper = celda.toUpperCase().trim();
+                        // Intentar sacar el valor si está en la celda contigua
+                        let valorSiguiente = (fila[idx+1] && typeof fila[idx+1] === 'string') ? fila[idx+1].trim() : '';
+
+                        if (celdaUpper.includes('GRUPO:')) {
+                            metadatos['Grupo'] = valorSiguiente || celda.split(':')[1]?.trim() || '--';
+                        }
+                        if (celdaUpper.includes('RESPONSABLE DEL PROYECTO:')) {
+                            metadatos['Responsable'] = valorSiguiente || celda.split(':')[1]?.trim() || '--';
+                        }
+                        if (celdaUpper.includes('NOMBRE DEL PROYECTO:')) {
+                            metadatos['Proyecto'] = valorSiguiente || celda.split(':')[1]?.trim() || '--';
+                        }
+                        if (celdaUpper.includes('EMERGENCIA:')) {
+                            metadatos['Emergencia'] = valorSiguiente || celda.split(':')[1]?.trim() || '--';
+                        }
+                        if (celdaUpper.includes('FECHA DE DILIGENCIAMIENTO:')) {
+                            metadatos['Fecha'] = valorSiguiente || celda.split(':')[1]?.trim() || '--';
+                        }
                     }
                 });
+            }
+
+            // Si no encontró el inicio de la tabla en las primeras 15 filas, asumir que está más abajo
+            if(filaInicioTabla === -1){
+                // Búsqueda profunda
+                 for (let i = 0; i < filas.length; i++) {
+                     if (filas[i].join("").toUpperCase().includes("ACTIVIDAD") && filas[i].join("").toUpperCase().includes("TAREA")) {
+                         filaInicioTabla = i;
+                         break;
+                     }
+                 }
             }
 
             metadatosGlobales[tipo] = metadatos;
@@ -273,7 +296,8 @@
 
             // B. Construir la Jerarquía (Actividad -> Tareas [13 columnas])
             if (filaInicioTabla === -1) {
-                console.error("No se encontró la cabecera de la tabla de 13 columnas.");
+                console.error("No se encontró la cabecera de la tabla.");
+                // Aún sin tabla, mostrar la tarjeta con la metadata encontrada (o vacía)
                 return;
             }
 
