@@ -3,21 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Afectación por Emergencia</title>
-    
-    <!-- Tailwind CSS para diseño rápido y moderno -->
+    <title>Dashboard de Seguimiento a Contingencias</title>
+    <!-- Tailwind CSS para diseño y estilos -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- PapaParse para procesar el CSV desde la URL de Google Sheets -->
+    <!-- PapaParse para lectura de CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    
-    <!-- Chart.js para los gráficos de resumen -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
     <!-- FontAwesome para íconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- Configuración personalizada de colores en Tailwind -->
+    
     <script>
         tailwind.config = {
             theme: {
@@ -28,627 +21,554 @@
                         'semaforo-rojo': '#c00000',
                         'semaforo-morado': '#7030a0',
                         'semaforo-cian': '#00d2ff',
-                        'semaforo-meta-verde': '#1e8449',
                     }
                 }
             }
         }
     </script>
     <style>
-        /* Estilos personalizados para animaciones y detalles de UI */
-        body { background-color: #f3f4f6; }
-        .card-details {
+        body { background-color: #f3f4f6; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        /* Animaciones para los acordeones */
+        .accordion-content {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.3s ease-out;
+            transition: max-height 0.4s ease-out, opacity 0.3s ease-out;
+            opacity: 0;
         }
-        .card-details.open {
-            max-height: 1000px; /* Suficiente espacio para el contenido */
-            transition: max-height 0.5s ease-in;
+        .accordion-content.open {
+            max-height: 3000px; /* Un valor grande para asegurar que cabe el contenido */
+            opacity: 1;
+            transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out;
         }
+        .icon-rotate { transition: transform 0.3s ease; }
         .rotate-180 { transform: rotate(180deg); }
-        .icon-transition { transition: transform 0.3s ease; }
         
-        /* Ocultar barra de desplazamiento para limpieza visual pero permitir scroll */
+        /* Ocultar barra de scroll pero permitir deslizamiento */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="text-gray-800 font-sans antialiased min-h-screen flex flex-col">
+<body class="text-gray-800 antialiased min-h-screen flex flex-col">
 
-    <!-- Navbar / Header -->
+    <!-- Header Fijo -->
     <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center">
                 <div class="flex items-center gap-3">
-                    <div class="bg-blue-600 text-white p-2 rounded-lg">
-                        <i class="fas fa-shield-alt text-xl"></i>
+                    <div class="bg-blue-700 text-white p-2 rounded-lg shadow-sm">
+                        <i class="fas fa-chart-pie text-xl"></i>
                     </div>
                     <h1 class="text-xl font-bold text-gray-900 tracking-tight">Monitor de Contingencias</h1>
                 </div>
-                <div class="flex items-center gap-4">
-                    <button onclick="document.getElementById('configModal').classList.remove('hidden')" class="text-gray-500 hover:text-blue-600 transition-colors" title="Configurar conexión a Google Sheets">
-                        <i class="fas fa-cog text-xl"></i>
-                    </button>
-                    <button id="refreshBtn" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2">
-                        <i class="fas fa-sync-alt"></i> Actualizar Datos
+                <div id="nav-actions" class="hidden flex gap-4 items-center">
+                    <button onclick="volverAlInicio()" class="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors flex items-center gap-2">
+                        <i class="fas fa-home"></i> Inicio
                     </button>
                 </div>
             </div>
         </div>
     </nav>
 
-    <!-- Modal de Configuración (Google Sheets URL) -->
-    <div id="configModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-[100] flex items-center justify-center backdrop-blur-sm">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 m-4 transform transition-all">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold text-gray-900">Conectar a Google Sheets</h3>
-                <button onclick="document.getElementById('configModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times"></i>
-                </button>
+    <!-- PANTALLA 1: Inicio (Tarjetas de Selección) -->
+    <main id="pantalla-inicio" class="flex-grow flex items-center justify-center p-6">
+        <div class="max-w-5xl w-full space-y-8">
+            <div class="text-center">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-4">Seleccione el reporte a visualizar</h2>
+                <p class="text-gray-500">Haga clic en una de las tarjetas para cargar la matriz correspondiente.</p>
             </div>
             
-            <div class="mb-4">
-                <p class="text-sm text-gray-600 mb-3">
-                    Para conectar en vivo, debes publicar tu Google Sheet como CSV:
-                </p>
-                <ol class="list-decimal list-inside text-xs text-gray-500 space-y-1 mb-4 bg-gray-50 p-3 rounded-md border border-gray-100">
-                    <li>Abre tu documento de Google Sheets.</li>
-                    <li>Ve a <strong>Archivo</strong> > <strong>Compartir</strong> > <strong>Publicar en la web</strong>.</li>
-                    <li>Selecciona "Todo el documento" y formato <strong>Valores separados por comas (.csv)</strong>.</li>
-                    <li>Copia el enlace generado y pégalo abajo.</li>
-                </ol>
-                <label class="block text-sm font-medium text-gray-700 mb-1">URL Pública del CSV</label>
-                <input type="text" id="sheetsUrl" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 border text-sm" placeholder="https://docs.google.com/spreadsheets/d/e/2PACX.../pub?output=csv">
-            </div>
-            <div class="flex justify-end gap-3">
-                <button onclick="document.getElementById('configModal').classList.add('hidden')" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Cancelar</button>
-                <button onclick="saveUrlAndLoad()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm">Guardar y Cargar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Contenido Principal -->
-    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6">
-        
-        <!-- Estado de carga -->
-        <div id="loadingState" class="hidden flex flex-col items-center justify-center py-20">
-            <i class="fas fa-circle-notch fa-spin text-4xl text-blue-500 mb-4"></i>
-            <p class="text-gray-500 font-medium">Obteniendo datos en vivo desde Google Sheets...</p>
-        </div>
-
-        <!-- Mensaje Inicial -->
-        <div id="emptyState" class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-            <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-satellite-dish text-3xl text-blue-500"></i>
-            </div>
-            <h2 class="text-xl font-bold text-gray-900 mb-2">Aún no hay datos conectados</h2>
-            <p class="text-gray-500 mb-6 max-w-md mx-auto">Configura la URL pública de tu matriz en Google Sheets para empezar a visualizar el impacto de la emergencia en tiempo real.</p>
-            <button onclick="document.getElementById('configModal').classList.remove('hidden')" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg shadow-sm hover:bg-blue-700 font-medium transition-all">
-                Conectar Datos Ahora
-            </button>
-        </div>
-
-        <!-- Dashboard Content (Oculto hasta que carguen datos) -->
-        <div id="dashboardContent" class="hidden space-y-6">
-            
-            <!-- Contexto del Proyecto -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-wrap gap-6 items-center justify-between">
-                <div>
-                    <h2 id="metaProyecto" class="text-2xl font-extrabold text-gray-900 leading-tight">Cargando...</h2>
-                    <p id="metaSubsecretaria" class="text-sm text-gray-500 flex items-center gap-2 mt-1">
-                        <i class="fas fa-sitemap"></i> Subsecretaría...
-                    </p>
-                </div>
-                <div class="flex gap-6 border-l border-gray-200 pl-6">
-                    <div>
-                        <p class="text-xs text-gray-400 uppercase font-semibold tracking-wider">Emergencia</p>
-                        <p id="metaEmergencia" class="font-medium text-gray-800">--</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-400 uppercase font-semibold tracking-wider">Fecha Reporte</p>
-                        <p id="metaFecha" class="font-medium text-gray-800">--/--/----</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- KPIs (Key Performance Indicators) -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xl">
-                        <i class="fas fa-list-check"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-500 font-medium">Total Tareas</p>
-                        <p id="kpiTotal" class="text-2xl font-bold text-gray-900">0</p>
-                    </div>
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-500 font-medium">Afectación Alta</p>
-                        <div class="flex items-baseline gap-2">
-                            <p id="kpiAfectacionAlta" class="text-2xl font-bold text-red-600">0</p>
-                            <p class="text-xs text-gray-400">tareas</p>
+                <!-- Tarjeta Enfoque Diferencial -->
+                <div onclick="cargarMatriz('enfoque')" class="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all cursor-pointer border border-gray-200 overflow-hidden group transform hover:-translate-y-1">
+                    <div class="h-2 bg-purple-500 w-full"></div>
+                    <div class="p-8">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="w-14 h-14 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-2xl group-hover:scale-110 transition-transform">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-900">Enfoque Diferencial</h3>
+                        </div>
+                        <div class="space-y-3 text-sm text-gray-600" id="meta-enfoque">
+                            <p><i class="fas fa-spinner fa-spin text-gray-400 w-5"></i> Cargando información del proyecto...</p>
+                        </div>
+                        <div class="mt-8 flex justify-end">
+                            <span class="text-purple-600 font-medium flex items-center gap-2 group-hover:gap-3 transition-all">Ver Dashboard <i class="fas fa-arrow-right"></i></span>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4 border-b-4 border-b-red-500">
-                    <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-xl">
-                        <i class="fas fa-bullseye"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-500 font-medium">Metas Afectadas</p>
-                        <div class="flex items-baseline gap-2">
-                            <p id="kpiMetasAfectadas" class="text-2xl font-bold text-gray-900">0</p>
-                            <p class="text-xs text-gray-400">tareas</p>
+                <!-- Tarjeta Cultura -->
+                <div onclick="cargarMatriz('cultura')" class="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all cursor-pointer border border-gray-200 overflow-hidden group transform hover:-translate-y-1">
+                    <div class="h-2 bg-blue-500 w-full"></div>
+                    <div class="p-8">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-2xl group-hover:scale-110 transition-transform">
+                                <i class="fas fa-hands-holding-circle"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-900">Cultura</h3>
+                        </div>
+                        <div class="space-y-3 text-sm text-gray-600" id="meta-cultura">
+                            <p><i class="fas fa-spinner fa-spin text-gray-400 w-5"></i> Cargando información del proyecto...</p>
+                        </div>
+                        <div class="mt-8 flex justify-end">
+                            <span class="text-blue-600 font-medium flex items-center gap-2 group-hover:gap-3 transition-all">Ver Dashboard <i class="fas fa-arrow-right"></i></span>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4 border-b-4 border-b-red-500">
-                    <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-xl">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-500 font-medium">Ind. Afectados</p>
-                        <div class="flex items-baseline gap-2">
-                            <p id="kpiIndicadoresAfectados" class="text-2xl font-bold text-gray-900">0</p>
-                            <p class="text-xs text-gray-400">tareas</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Layout Principal: Gráficos + Listado -->
-            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                
-                <!-- Columna Izquierda: Filtros -->
-                <div class="xl:col-span-1 space-y-6">
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-                        <h3 class="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <i class="fas fa-filter text-gray-400"></i> Filtros Rápidos
-                        </h3>
-                        <div class="space-y-3">
-                            <button onclick="setFilter('all')" id="btn-filter-all" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors bg-blue-50 text-blue-700 ring-1 ring-blue-600/20">
-                                Todas las Tareas
-                            </button>
-                            <button onclick="setFilter('afectacion-alta')" id="btn-filter-afectacion-alta" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent">
-                                Afectación Alta
-                            </button>
-                            <button onclick="setFilter('afectacion-parcial')" id="btn-filter-afectacion-parcial" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent">
-                                Afectación Parcial
-                            </button>
-                            <button onclick="setFilter('metas-afectadas')" id="btn-filter-metas-afectadas" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent">
-                                Metas Afectadas
-                            </button>
-                            <button onclick="setFilter('indicadores-afectados')" id="btn-filter-indicadores-afectados" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent">
-                                Indicadores Afectados
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Columna Derecha: Tarjetas de Tareas Agrupadas -->
-                <div class="xl:col-span-2">
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-4 flex justify-between items-center">
-                        <h3 class="text-lg font-bold text-gray-900">Actividades y Tareas Evaluadas</h3>
-                        <span id="tareasCount" class="bg-blue-100 text-blue-800 py-1 px-3 rounded-full text-xs font-bold">0 Tareas filtradas</span>
-                    </div>
-
-                    <!-- Contenedor de Actividades (Acordeones) -->
-                    <div id="cardsContainer" class="space-y-4">
-                        <!-- Las actividades se inyectan dinámicamente aquí mediante JS -->
-                    </div>
-                </div>
             </div>
         </div>
     </main>
 
+    <!-- PANTALLA 2: Dashboard Principal -->
+    <main id="pantalla-dashboard" class="hidden flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6">
+        
+        <!-- Encabezado del Dashboard -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <span id="dash-badge" class="px-3 py-1 text-xs font-bold rounded-full bg-gray-100 text-gray-600 mb-2 inline-block">Área</span>
+                <h2 id="dash-proyecto" class="text-2xl font-bold text-gray-900 leading-tight">Nombre del Proyecto</h2>
+                <p id="dash-responsable" class="text-sm text-gray-500 mt-1">Responsable: --</p>
+            </div>
+            <div class="flex flex-wrap gap-4 text-sm text-right">
+                <div class="bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
+                    <p class="text-xs text-gray-400 font-semibold uppercase">Emergencia</p>
+                    <p id="dash-emergencia" class="font-medium text-gray-800">--</p>
+                </div>
+                <div class="bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
+                    <p class="text-xs text-gray-400 font-semibold uppercase">Fecha Reporte</p>
+                    <p id="dash-fecha" class="font-medium text-gray-800">--/--/----</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Herramientas: Buscador y Filtros -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sticky top-16 z-40 flex flex-col md:flex-row gap-4 justify-between items-center">
+            
+            <!-- Buscador en tiempo real -->
+            <div class="relative w-full md:w-1/3">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+                <input type="text" id="buscador" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors" placeholder="Buscar actividad o tarea...">
+            </div>
+
+            <!-- Filtros por Color (Semáforo Tarea) -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold text-gray-500 mr-2 uppercase tracking-wide">Filtros Rápidos:</span>
+                <button onclick="filtrarPorColor('todos')" id="btn-filtro-todos" class="filtro-btn active px-3 py-1.5 rounded-full text-xs font-bold border border-gray-300 bg-gray-800 text-white shadow-sm transition-all hover:bg-gray-700">Todos</button>
+                
+                <button onclick="filtrarPorColor('rojo')" id="btn-filtro-rojo" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-red-200 bg-white text-red-700 shadow-sm transition-all hover:bg-red-50 flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-semaforo-rojo inline-block"></span> Riesgo Alto
+                </button>
+                
+                <button onclick="filtrarPorColor('amarillo')" id="btn-filtro-amarillo" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-yellow-300 bg-white text-yellow-700 shadow-sm transition-all hover:bg-yellow-50 flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-semaforo-amarillo inline-block"></span> Parcial
+                </button>
+                
+                <button onclick="filtrarPorColor('verde')" id="btn-filtro-verde" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-green-300 bg-white text-green-700 shadow-sm transition-all hover:bg-green-50 flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-semaforo-verde inline-block"></span> Normal
+                </button>
+
+                <button onclick="filtrarPorColor('otros')" id="btn-filtro-otros" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-gray-300 bg-white text-gray-600 shadow-sm transition-all hover:bg-gray-50 flex items-center gap-1" title="Morado (No aplica) o Cian (Sobre-ejecución)">
+                    <span class="w-2 h-2 rounded-full bg-semaforo-morado inline-block"></span> / <span class="w-2 h-2 rounded-full bg-semaforo-cian inline-block"></span> Otros
+                </button>
+            </div>
+        </div>
+
+        <!-- Contenedor Principal de Datos (Acordeones) -->
+        <div id="contenedor-actividades" class="space-y-4">
+            <!-- Se inyectarán los datos aquí -->
+            <div class="text-center py-20 text-gray-500">
+                <i class="fas fa-circle-notch fa-spin text-3xl mb-3"></i>
+                <p>Generando vista de matriz...</p>
+            </div>
+        </div>
+
+        <!-- Estado Vacío para Búsqueda -->
+        <div id="estado-vacio" class="hidden text-center py-16 bg-white rounded-xl border border-gray-200 border-dashed">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400 text-2xl">
+                <i class="fas fa-search-minus"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900">No se encontraron resultados</h3>
+            <p class="text-gray-500 mt-1">Intenta con otros términos de búsqueda o cambia los filtros de color.</p>
+        </div>
+
+    </main>
+
     <script>
-        // Variables Globales
-        let rawData = [];
-        let parsedTasks = [];
-        let groupedData = {}; 
-        let currentFilter = 'all';
+        // URLs PÚBLICAS (Conectadas directamente a tus Google Sheets mediante las pestañas específicas)
+        const URLS = {
+            'enfoque': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR-A_QjLWSri4tam1_5359GJotzRd40HTRgjwBtbrDYYREcZdoUWWlVvhJHkC6-R0AOo9i_50s9FyaR/pub?gid=0&single=true&output=csv', 
+            'cultura': 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR-A_QjLWSri4tam1_5359GJotzRd40HTRgjwBtbrDYYREcZdoUWWlVvhJHkC6-R0AOo9i_50s9FyaR/pub?gid=628947574&single=true&output=csv'
+        };
 
-        // Configuración Inicial
-        const DEFAULT_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR-A_QjLWSri4tam1_5359GJotzRd40HTRgjwBtbrDYYREcZdoUWWlVvhJHkC6-R0AOo9i_50s9FyaR/pub?output=csv';
-        const savedUrl = localStorage.getItem('sheetsUrl');
-        const urlToLoad = savedUrl || DEFAULT_URL;
-        
-        document.getElementById('sheetsUrl').value = urlToLoad;
-        
-        window.addEventListener('DOMContentLoaded', (event) => {
-             loadDataFromGoogleSheets(urlToLoad);
-        });
+        // Estado Global
+        let datosGlobales = { 'enfoque': null, 'cultura': null };
+        let metadatosGlobales = { 'enfoque': {}, 'cultura': {} };
+        let datosActivos = null; // Jerarquía de actividades actuales
+        let filtroActual = 'todos';
 
-        document.getElementById('refreshBtn').addEventListener('click', () => {
-            const url = document.getElementById('sheetsUrl').value.trim() || DEFAULT_URL;
-            loadDataFromGoogleSheets(url);
-        });
+        // 1. INICIALIZACIÓN: Cargar metadatos para las tarjetas al abrir
+        window.onload = function() {
+            // Cargar la data de ambos archivos silenciosamente en segundo plano al cargar la página
+            cargarDatosCrudos('enfoque');
+            cargarDatosCrudos('cultura');
+        };
 
-        function saveUrlAndLoad() {
-            const url = document.getElementById('sheetsUrl').value.trim();
-            if (!url) return alert("Por favor ingresa una URL válida.");
-            localStorage.setItem('sheetsUrl', url);
-            document.getElementById('configModal').classList.add('hidden');
-            loadDataFromGoogleSheets(url);
-        }
-
-        function showLoading(show) {
-            document.getElementById('loadingState').style.display = show ? 'flex' : 'none';
-            if (show) {
-                document.getElementById('emptyState').style.display = 'none';
-                document.getElementById('dashboardContent').style.display = 'none';
-            }
-        }
-
-        function loadDataFromGoogleSheets(url) {
-            showLoading(true);
-            Papa.parse(url, {
+        // Función para leer el CSV y extraer TODO
+        function cargarDatosCrudos(tipo) {
+            Papa.parse(URLS[tipo], {
                 download: true,
-                header: false, 
+                header: false,
+                encoding: "UTF-8",
                 complete: function(results) {
-                    rawData = results.data;
-                    processData(rawData);
+                    procesarEstructuraBase(tipo, results.data);
                 },
                 error: function(err) {
-                    showLoading(false);
-                    alert("Error al cargar los datos. Verifica que la URL sea un CSV público válido.\nDetalles: " + err);
-                    document.getElementById('emptyState').style.display = 'block';
+                    console.error("Error cargando CSV de " + tipo, err);
+                    document.getElementById(`meta-${tipo}`).innerHTML = `<p class="text-red-500"><i class="fas fa-exclamation-triangle"></i> Error al conectar con Google Sheets.</p>`;
                 }
             });
         }
 
-        function processData(data) {
-            if (!data || data.length === 0) return;
+        // 2. PROCESAMIENTO: Separar Metadatos y agrupar en la Jerarquía de 13 Columnas
+        function procesarEstructuraBase(tipo, filas) {
+            let metadatos = {};
+            let filaInicioTabla = -1;
 
-            // Extraer Metadatos (Filas 1 a 11 aproximadamente en el formato original)
-            let metadata = { proyecto: '', subsecretaria: '', emergencia: '', fecha: '' };
-            let tableStartIndex = -1;
-
-            // Buscar la fila de encabezados de la tabla principal.
-            // Asumimos que la tabla principal comienza donde encontramos '1. ACTIVIDAD' o '2. TAREA'
-            for (let i = 0; i < data.length; i++) {
-                const row = data[i];
-                if (!row) continue;
+            // A. Extraer Metadatos (Generalmente en las primeras 10 filas)
+            for (let i = 0; i < Math.min(15, filas.length); i++) {
+                const fila = filas[i];
                 
-                // Recolectar metadatos en las primeras filas
-                row.forEach((cell, idx) => {
-                    if (typeof cell === 'string') {
-                        let upperCell = cell.toUpperCase().trim();
-                        if (upperCell.includes('NOMBRE DEL PROYECTO:')) metadata.proyecto = row[idx + 1] || '';
-                        if (upperCell.includes('SUBSECRETARÍA')) metadata.subsecretaria = cell;
-                        if (upperCell.includes('EMERGENCIA:')) metadata.emergencia = row[idx + 1] || '';
-                        if (upperCell.includes('FECHA DE DILIGENCIAMIENTO:') || upperCell.includes('FECHA:')) metadata.fecha = row[idx + 1] || '';
-                    }
-                });
-
-                // Detectar inicio de tabla
-                if (row.some(cell => typeof cell === 'string' && (cell.includes('1. ACTIVIDAD') || cell.includes('2. TAREA')))) {
-                    tableStartIndex = i;
+                // Buscar dónde empiezan los encabezados de la tabla (las 13 columnas)
+                const textoFila = fila.join("").toUpperCase();
+                if (textoFila.includes("ACTIVIDAD") && textoFila.includes("TAREA") && textoFila.includes("CANTIDAD PROGRAMADA")) {
+                    filaInicioTabla = i;
                     break;
                 }
-            }
 
-            if (tableStartIndex === -1) {
-                showLoading(false);
-                alert("No se pudo identificar el inicio de la tabla (encabezados '1. ACTIVIDAD' o '2. TAREA').");
-                return;
-            }
-
-            // Actualizar UI con metadatos
-            document.getElementById('metaProyecto').textContent = metadata.proyecto || 'Proyecto no especificado';
-            document.getElementById('metaSubsecretaria').innerHTML = `<i class="fas fa-sitemap"></i> ${metadata.subsecretaria || 'Subsecretaría no especificada'}`;
-            document.getElementById('metaEmergencia').textContent = metadata.emergencia || 'No especificada';
-            document.getElementById('metaFecha').textContent = metadata.fecha || '--/--/----';
-
-            // Extraer las 13 columnas de la tabla principal
-            // La fila de encabezados real suele estar en tableStartIndex, pero las columnas exactas 
-            // a veces están combinadas o en una segunda fila. Asumiremos los índices basados en la estructura estándar de 13 columnas.
-            
-            // Índices esperados de las 13 columnas:
-            // 0: 1. ACTIVIDAD
-            // 1: 2. TAREA
-            // 2: MAGNITUD PROGRAMADA TERCER TRIMESTRE
-            // 3: MAGNITUD PROGRAMADA CUARTO TRIMESTRE
-            // 4: MAGNITUD EJECUTADA A LA FECHA
-            // 5: MAGNITUD PENDIENTE DE EJECUCIÓN
-            // 6: 4. NIVEL DE AFECTACIÓN DE LA TAREA
-            // 7: 5. LA AFECTACIÓN DE LA TAREA IMPACTA EL CUMPLIMIENTO DE LA META
-            // 8: 6. LA AFECTACIÓN DE LA TAREA IMPACTA EL CUMPLIMIENTO DE INDICADORES
-            // 9: JUSTIFICACIÓN / OBSERVACIONES
-            // 10: ACCIONES EJECUTADAS / MITIGACIÓN
-            // 11: PLAN DE CONTINGENCIA
-            // 12: ESTADO (o similar) / DEPENDENCIAS
-            
-            // Nota: Mapearemos a los 13 índices exactos, ignorando filas vacías o de instrucciones
-            parsedTasks = [];
-            let lastActividad = "Sin Actividad Definida";
-            
-            // Empezamos a leer desde la fila siguiente a los encabezados
-            // Si hay filas combinadas de cabecera, podríamos saltarlas (por ej +2), aquí saltamos +1
-            const dataRows = data.slice(tableStartIndex + 1);
-            
-            dataRows.forEach((row, index) => {
-                // Si la fila está completamente vacía (o casi), la saltamos
-                if (!row.some(cell => typeof cell === 'string' && cell.trim() !== '')) return;
-                
-                // Evitamos filas que parezcan instrucciones o sub-encabezados largos
-                if (row[0] && row[0].toString().includes("Instrucciones:")) return;
-                if (row[1] && row[1].toString().includes("SEMÁFORO DESPLEGABLE")) return;
-
-                // Las 13 Columnas
-                const colActividad = row[0] || '';
-                const colTarea = row[1] || '';
-                const colMagProgQ3 = row[2] || '';
-                const colMagProgQ4 = row[3] || '';
-                const colMagEjec = row[4] || '';
-                const colMagPend = row[5] || '';
-                const colNivelAfect = row[6] || '';
-                const colAfectMeta = row[7] || '';
-                const colAfectInd = row[8] || '';
-                const colJustificacion = row[9] || '';
-                const colAcciones = row[10] || '';
-                const colPlanCont = row[11] || '';
-                const colTrece = row[12] || ''; // Columna extra si la hay (ej. Responsable/Estado)
-
-                // Si hay tarea pero no afectación o viceversa, y no parece un encabezado, lo tomamos
-                if (colTarea.trim() === '' && colNivelAfect.trim() === '') return;
-
-                // Arrastrar el nombre de la actividad si la celda está combinada o vacía
-                if (colActividad && colActividad.trim() !== '') {
-                    lastActividad = colActividad.trim();
-                }
-
-                parsedTasks.push({
-                    id: index,
-                    actividad: lastActividad,
-                    tarea: colTarea.trim(),
-                    magProgQ3: colMagProgQ3,
-                    magProgQ4: colMagProgQ4,
-                    magEjec: colMagEjec,
-                    magPend: colMagPend,
-                    afectacionTarea: colNivelAfect.trim(),
-                    afectacionMeta: colAfectMeta.trim(),
-                    afectacionIndicador: colAfectInd.trim(),
-                    justificacion: colJustificacion,
-                    acciones: colAcciones,
-                    contingencia: colPlanCont,
-                    columna13: colTrece
+                // Extraer pares clave-valor
+                fila.forEach((celda, idx) => {
+                    if (typeof celda === 'string' && celda.trim() !== '') {
+                        let clave = celda.toUpperCase().trim();
+                        if (clave.includes('GRUPO:')) metadatos['Grupo'] = fila[idx+1] || '--';
+                        if (clave.includes('RESPONSABLE DEL PROYECTO:')) metadatos['Responsable'] = fila[idx+1] || '--';
+                        if (clave.includes('NOMBRE DEL PROYECTO:')) metadatos['Proyecto'] = fila[idx+1] || '--';
+                        if (clave.includes('EMERGENCIA:')) metadatos['Emergencia'] = fila[idx+1] || '--';
+                        if (clave.includes('FECHA DE DILIGENCIAMIENTO:')) metadatos['Fecha'] = fila[idx+1] || '--';
+                    }
                 });
-            });
-
-            showLoading(false);
-            document.getElementById('emptyState').style.display = 'none';
-            document.getElementById('dashboardContent').style.display = 'block';
-            
-            updateDashboard();
-        }
-
-        function updateDashboard() {
-            updateKPIs();
-            renderCards();
-        }
-
-        function updateKPIs() {
-            document.getElementById('kpiTotal').textContent = parsedTasks.length;
-            
-            const altas = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta')).length;
-            document.getElementById('kpiAfectacionAlta').textContent = altas;
-            
-            const metas = parsedTasks.filter(t => (t.afectacionMeta || '').toLowerCase().includes('si afecta')).length;
-            document.getElementById('kpiMetasAfectadas').textContent = metas;
-            
-            const indicadores = parsedTasks.filter(t => (t.afectacionIndicador || '').toLowerCase().includes('si afecta')).length;
-            document.getElementById('kpiIndicadoresAfectados').textContent = indicadores;
-        }
-
-        function setFilter(filterId) {
-            currentFilter = filterId;
-            
-            const buttons = ['all', 'afectacion-alta', 'afectacion-parcial', 'metas-afectadas', 'indicadores-afectados'];
-            buttons.forEach(id => {
-                const btn = document.getElementById(`btn-filter-${id}`);
-                if (id === filterId) {
-                    btn.className = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors bg-blue-50 text-blue-700 ring-1 ring-blue-600/20";
-                } else {
-                    btn.className = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent";
-                }
-            });
-
-            renderCards();
-        }
-
-        function getBadgeInfo(text, type) {
-            const t = (text || '').toLowerCase().trim();
-            if (!t) return { color: 'bg-gray-100 text-gray-500 border-gray-200', icon: 'fa-minus', text: 'No Evaluado' };
-
-            if (type === 'tarea') {
-                if (t.includes('sin afectación')) return { color: 'bg-green-100 text-green-800 border-green-200', icon: 'fa-check-circle', text: text };
-                if (t.includes('afectación parcial')) return { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: 'fa-exclamation-circle', text: text };
-                if (t.includes('afectación alta')) return { color: 'bg-red-100 text-red-800 border-red-200', icon: 'fa-times-circle', text: text };
-                if (t.includes('no aplica')) return { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: 'fa-ban', text: text };
-                if (t.includes('sobre-ejecución') || t.includes('sobre ejecución')) return { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: 'fa-arrow-up', text: text };
-            } 
-            else if (type === 'meta' || type === 'indicador') {
-                if (t.includes('no afecta')) return { color: 'bg-green-50 text-green-700 border-green-200', icon: 'fa-check', text: text };
-                if (t.includes('si afecta') || t.includes('sí afecta')) return { color: 'bg-red-50 text-red-700 border-red-200', icon: 'fa-exclamation-triangle', text: text };
-            }
-            return { color: 'bg-gray-100 text-gray-700 border-gray-200', icon: 'fa-info-circle', text: text };
-        }
-
-        function toggleActivity(id) {
-            const content = document.getElementById(`act-content-${id}`);
-            const icon = document.getElementById(`act-icon-${id}`);
-            content.classList.toggle('hidden');
-            icon.classList.toggle('rotate-180');
-        }
-
-        function toggleTask(id) {
-            const content = document.getElementById(`content-${id}`);
-            const icon = document.getElementById(`icon-${id}`);
-            content.classList.toggle('open');
-            icon.classList.toggle('rotate-180');
-        }
-
-        function renderCards() {
-            const container = document.getElementById('cardsContainer');
-            container.innerHTML = '';
-
-            let filteredTasks = parsedTasks;
-            if (currentFilter === 'afectacion-alta') {
-                filteredTasks = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta'));
-            } else if (currentFilter === 'afectacion-parcial') {
-                filteredTasks = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('parcial'));
-            } else if (currentFilter === 'metas-afectadas') {
-                filteredTasks = parsedTasks.filter(t => (t.afectacionMeta || '').toLowerCase().includes('si afecta'));
-            } else if (currentFilter === 'indicadores-afectados') {
-                filteredTasks = parsedTasks.filter(t => (t.afectacionIndicador || '').toLowerCase().includes('si afecta'));
             }
 
-            document.getElementById('tareasCount').textContent = `${filteredTasks.length} tareas en esta vista`;
+            metadatosGlobales[tipo] = metadatos;
+            actualizarTarjeta(tipo, metadatos);
 
-            if (filteredTasks.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
-                        <i class="fas fa-search text-3xl text-gray-300 mb-3"></i>
-                        <p class="text-gray-500">No hay tareas que coincidan con este filtro.</p>
-                    </div>
-                `;
+            // B. Construir la Jerarquía (Actividad -> Tareas [13 columnas])
+            if (filaInicioTabla === -1) {
+                console.error("No se encontró la cabecera de la tabla de 13 columnas.");
                 return;
             }
 
-            groupedData = {};
-            filteredTasks.forEach(task => {
-                if(!groupedData[task.actividad]) {
-                    groupedData[task.actividad] = [];
+            let jerarquia = [];
+            let actividadActual = null;
+            
+            // Empezar a leer desde la fila SIGUIENTE a los encabezados, saltando la fila 8 (que tiene los textos explicativos)
+            for (let i = filaInicioTabla + 2; i < filas.length; i++) {
+                let fila = filas[i];
+                
+                // Ignorar filas totalmente vacías
+                if (fila.join("").trim() === "") continue;
+
+                // Extraer las 13 columnas exactas según el acuerdo
+                // Col 0: Actividad | Col 1: Tarea | Col 2: Prog Q3 | Col 3: Prog Q4 | Col 4: Afect. Tarea 
+                // Col 5: Afect. Meta | Col 6: Afect. Ind | Col 7: Ind. Afectado | Col 8: Justificación
+                // Col 9: Acciones | Col 10: Plan Cont. | Col 11: Reprog Q3 | Col 12: Reprog Q4
+
+                const nombreActividad = fila[0] ? fila[0].trim() : "";
+                const nombreTarea = fila[1] ? fila[1].trim() : "";
+
+                // Si hay texto en la Columna 0, significa que empieza una NUEVA ACTIVIDAD macro
+                if (nombreActividad !== "") {
+                    actividadActual = {
+                        nombre: nombreActividad,
+                        progQ3: fila[2] || "0",
+                        progQ4: fila[3] || "0",
+                        reprogQ3: fila[11] || "-",
+                        reprogQ4: fila[12] || "-",
+                        tareas: []
+                    };
+                    jerarquia.push(actividadActual);
                 }
-                groupedData[task.actividad].push(task);
-            });
 
-            let actIndex = 0;
-            for (const [actividadNombre, tareas] of Object.entries(groupedData)) {
-                actIndex++;
-                
-                const numAlta = tareas.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta')).length;
-                let badgeAlert = '';
-                if(numAlta > 0) {
-                    badgeAlert = `<span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full"><i class="fas fa-exclamation-circle"></i> ${numAlta} en riesgo</span>`;
+                // Si hay una tarea y tenemos una actividad contenedora activa, la añadimos a su lista
+                if (nombreTarea !== "" && actividadActual !== null) {
+                    actividadActual.tareas.push({
+                        tarea: nombreTarea,
+                        progQ3_tarea: fila[2] || "-", // A veces se repite el número a nivel tarea
+                        progQ4_tarea: fila[3] || "-",
+                        afectacionTarea: fila[4] || "",
+                        afectacionMeta: fila[5] || "",
+                        afectacionInd: fila[6] || "",
+                        indicadorAfectado: fila[7] || "No especificado",
+                        justificacion: fila[8] || "No aplica",
+                        acciones: fila[9] || "No registra",
+                        planContingencia: fila[10] || "No requiere"
+                    });
                 }
+            }
 
-                const actCard = document.createElement('div');
-                actCard.className = "bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden";
+            datosGlobales[tipo] = jerarquia;
+        }
+
+        // 3. UI: Actualizar Tarjetas de Inicio
+        function actualizarTarjeta(tipo, meta) {
+            const contenedor = document.getElementById(`meta-${tipo}`);
+            contenedor.innerHTML = `
+                <p><i class="fas fa-sitemap w-5 text-gray-400"></i> <span class="font-semibold text-gray-700">Grupo:</span> ${meta.Grupo || 'N/A'}</p>
+                <p class="truncate" title="${meta.Proyecto}"><i class="fas fa-folder-open w-5 text-gray-400"></i> <span class="font-semibold text-gray-700">Proyecto:</span> ${meta.Proyecto || 'N/A'}</p>
+                <p><i class="fas fa-user-tie w-5 text-gray-400"></i> <span class="font-semibold text-gray-700">Líder:</span> ${meta.Responsable || 'N/A'}</p>
+                <p><i class="fas fa-calendar-alt w-5 text-gray-400"></i> <span class="font-semibold text-gray-700">Actualizado:</span> ${meta.Fecha || 'N/A'}</p>
+            `;
+        }
+
+        // 4. NAVEGACIÓN: Ir al Dashboard
+        function cargarMatriz(tipo) {
+            if (!datosGlobales[tipo]) {
+                alert("Los datos aún se están cargando o hubo un error de conexión.");
+                return;
+            }
+
+            // Ocultar inicio, mostrar dashboard
+            document.getElementById('pantalla-inicio').classList.add('hidden');
+            document.getElementById('pantalla-dashboard').classList.remove('hidden');
+            document.getElementById('nav-actions').classList.remove('hidden');
+
+            // Setear Metadatos en la cabecera
+            const meta = metadatosGlobales[tipo];
+            document.getElementById('dash-badge').className = `px-3 py-1 text-xs font-bold rounded-full mb-2 inline-block ${tipo === 'enfoque' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`;
+            document.getElementById('dash-badge').textContent = tipo === 'enfoque' ? 'Enfoque Diferencial' : 'Cultura';
+            
+            document.getElementById('dash-proyecto').textContent = meta.Proyecto || 'Proyecto sin nombre';
+            document.getElementById('dash-responsable').textContent = `Responsable: ${meta.Responsable || 'No asignado'}`;
+            document.getElementById('dash-emergencia').textContent = meta.Emergencia || '--';
+            document.getElementById('dash-fecha').textContent = meta.Fecha || '--/--/----';
+
+            // Renderizar la jerarquía
+            datosActivos = datosGlobales[tipo];
+            filtroActual = 'todos';
+            actualizarBotonesFiltro();
+            document.getElementById('buscador').value = '';
+            renderizarJerarquia();
+        }
+
+        function volverAlInicio() {
+            document.getElementById('pantalla-dashboard').classList.add('hidden');
+            document.getElementById('nav-actions').classList.add('hidden');
+            document.getElementById('pantalla-inicio').classList.remove('hidden');
+        }
+
+        // 5. DISEÑO UX: Funciones de Color para Semáforos
+        function clasificarSemaforoTarea(texto) {
+            const t = texto.toLowerCase();
+            if (t.includes("sin afectación")) return { color: 'bg-semaforo-verde text-white', label: 'Normal', categoria: 'verde' };
+            if (t.includes("afectación parcial")) return { color: 'bg-semaforo-amarillo text-black', label: 'Parcial', categoria: 'amarillo' };
+            if (t.includes("afectación alta")) return { color: 'bg-semaforo-rojo text-white', label: 'Riesgo Alto', categoria: 'rojo' };
+            if (t.includes("no aplica")) return { color: 'bg-semaforo-morado text-white', label: 'N/A', categoria: 'otros' };
+            if (t.includes("sobre-ejecución") || t.includes("sobre ejecución")) return { color: 'bg-semaforo-cian text-black', label: 'Sobre-ejecución', categoria: 'otros' };
+            return { color: 'bg-gray-200 text-gray-700', label: 'Sin Datos', categoria: 'todos' };
+        }
+
+        function getColorBinario(texto, tipo) {
+            const t = texto.toLowerCase();
+            if (t.includes("no afecta")) return 'bg-green-100 text-green-700 border-green-200';
+            if (t.includes("si afecta") || t.includes("sí afecta")) return 'bg-red-100 text-red-700 border-red-200';
+            return 'bg-gray-100 text-gray-600 border-gray-200';
+        }
+
+        // 6. RENDERIZADO PRINCIPAL (El motor del Acordeón)
+        function renderizarJerarquia() {
+            const contenedor = document.getElementById('contenedor-actividades');
+            contenedor.innerHTML = '';
+            let acordeonesVisibles = 0;
+
+            const terminoBusqueda = document.getElementById('buscador').value.toLowerCase();
+
+            datosActivos.forEach((actividad, indexActividad) => {
                 
-                let tareasHTML = '';
+                // A. Filtrar Tareas Internas
+                let tareasFiltradas = actividad.tareas.filter(tarea => {
+                    // Filtro de Color
+                    const semaforoInfo = clasificarSemaforoTarea(tarea.afectacionTarea);
+                    const pasaFiltroColor = (filtroActual === 'todos') || (semaforoInfo.categoria === filtroActual);
+                    
+                    // Filtro de Búsqueda
+                    const textoBusqueda = `${actividad.nombre} ${tarea.tarea} ${tarea.justificacion}`.toLowerCase();
+                    const pasaFiltroBusqueda = terminoBusqueda === '' || textoBusqueda.includes(terminoBusqueda);
+
+                    return pasaFiltroColor && pasaFiltroBusqueda;
+                });
+
+                // Si no hay tareas después de filtrar, no renderizamos esta actividad
+                if (tareasFiltradas.length === 0) return;
                 
-                tareas.forEach(task => {
-                    const infoTarea = getBadgeInfo(task.afectacionTarea, 'tarea');
-                    const infoMeta = getBadgeInfo(task.afectacionMeta, 'meta');
-                    const infoInd = getBadgeInfo(task.afectacionIndicador, 'indicador');
+                acordeonesVisibles++;
 
-                    tareasHTML += `
-                        <div class="border-t border-gray-100 hover:bg-gray-50/50 transition-colors">
-                            <div class="p-4 pl-6 cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-4" onclick="toggleTask(${task.id})">
-                                <!-- Info Principal de Tarea -->
-                                <div class="flex-grow max-w-3xl">
-                                    <div class="flex items-center gap-3 mb-1">
-                                        <span class="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">TAREA</span>
-                                    </div>
-                                    <h4 class="text-sm font-semibold text-gray-900 leading-snug">${task.tarea || '<i>(Tarea sin descripción)</i>'}</h4>
-                                    
-                                    <!-- Semáforos Inline -->
-                                    <div class="mt-2 flex flex-wrap gap-2">
-                                        <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold border ${infoTarea.color}">
-                                            <i class="fas ${infoTarea.icon}"></i> ${infoTarea.text.split(':')[0]}
-                                        </span>
-                                        ${(infoMeta.text && infoMeta.text.toLowerCase().includes('afecta')) ? 
-                                            `<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold border ${infoMeta.color}">
-                                                <i class="fas ${infoMeta.icon}"></i> Meta afectada
-                                            </span>` : ''}
-                                        ${(infoInd.text && infoInd.text.toLowerCase().includes('afecta')) ? 
-                                            `<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold border ${infoInd.color}">
-                                                <i class="fas ${infoInd.icon}"></i> Ind. afectado
-                                            </span>` : ''}
-                                    </div>
-                                </div>
+                // B. Construir HTML Nivel 1 (Actividad - Cabecera del Acordeón)
+                const divActividad = document.createElement('div');
+                divActividad.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300';
+                
+                // Cabecera Actividad
+                let html = `
+                    <div class="p-5 bg-gray-50 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 cursor-pointer hover:bg-gray-100 transition-colors" onclick="toggleAccordion('acordeon-${indexActividad}', 'icono-${indexActividad}')">
+                        <div class="flex-1 flex items-start gap-3">
+                            <i id="icono-${indexActividad}" class="fas fa-chevron-down mt-1 text-gray-400 icon-rotate rotate-180"></i>
+                            <div>
+                                <span class="text-xs font-bold text-blue-600 uppercase tracking-wide">Actividad Macro</span>
+                                <h3 class="text-base font-bold text-gray-800 leading-snug mt-1">${actividad.nombre}</h3>
+                                <p class="text-xs text-gray-500 mt-1">${tareasFiltradas.length} Tareas listadas</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Bloque de Cantidades Programadas -->
+                        <div class="flex gap-4 border-l-2 border-gray-200 pl-4">
+                            <div class="text-center">
+                                <p class="text-[10px] text-gray-500 font-bold uppercase">Prog. Q3</p>
+                                <p class="text-lg font-bold text-gray-800">${actividad.progQ3}</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-[10px] text-gray-500 font-bold uppercase">Prog. Q4</p>
+                                <p class="text-lg font-bold text-gray-800">${actividad.progQ4}</p>
+                            </div>
+                            <div class="text-center bg-yellow-50 px-3 rounded-lg border border-yellow-100">
+                                <p class="text-[10px] text-yellow-700 font-bold uppercase">Reprog. Q4</p>
+                                <p class="text-lg font-bold text-yellow-700">${actividad.reprogQ4}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Nivel 2: Contenedor de Tareas (Acordeón desplegable) -->
+                    <div id="acordeon-${indexActividad}" class="accordion-content open bg-white">
+                        <div class="p-5 border-t border-gray-100 space-y-4">
+                `;
 
-                                <!-- Magnitudes (4 columnas) -->
-                                <div class="flex flex-wrap lg:flex-nowrap gap-2 shrink-0">
-                                    <div class="bg-blue-50/50 p-2 rounded border border-blue-100/50 min-w-[70px]">
-                                        <div class="text-[10px] text-gray-500 font-medium">Prog. Q3</div>
-                                        <div class="font-bold text-gray-800 text-xs">${task.magProgQ3 || '-'}</div>
-                                    </div>
-                                    <div class="bg-blue-50/50 p-2 rounded border border-blue-100/50 min-w-[70px]">
-                                        <div class="text-[10px] text-gray-500 font-medium">Prog. Q4</div>
-                                        <div class="font-bold text-gray-800 text-xs">${task.magProgQ4 || '-'}</div>
-                                    </div>
-                                    <div class="bg-gray-50 p-2 rounded border border-gray-200 min-w-[70px]">
-                                        <div class="text-[10px] text-gray-500 font-medium">Ejecutado</div>
-                                        <div class="font-bold text-gray-800 text-xs">${task.magEjec || '-'}</div>
-                                    </div>
-                                    <div class="bg-gray-50 p-2 rounded border border-gray-200 min-w-[70px]">
-                                        <div class="text-[10px] text-gray-500 font-medium">Pendiente</div>
-                                        <div class="font-bold text-gray-800 text-xs">${task.magPend || '-'}</div>
-                                    </div>
+                // C. Construir HTML Nivel 2 y 3 (Tarjetas de Tareas)
+                tareasFiltradas.forEach((tarea, indexTarea) => {
+                    const semaforoTarea = clasificarSemaforoTarea(tarea.afectacionTarea);
+                    const colorMeta = getColorBinario(tarea.afectacionMeta);
+                    const colorInd = getColorBinario(tarea.afectacionInd);
+
+                    html += `
+                        <div class="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors bg-white">
+                            
+                            <!-- Tarea Header -->
+                            <div class="flex justify-between items-start gap-4 mb-4">
+                                <div class="flex-1">
+                                    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold shadow-sm mb-2 ${semaforoTarea.color}">
+                                        ${semaforoTarea.label}
+                                    </span>
+                                    <p class="text-sm font-semibold text-gray-800">${tarea.tarea}</p>
                                 </div>
-                                
-                                <div class="text-gray-400 shrink-0 self-end lg:self-center ml-2">
-                                    <i class="fas fa-chevron-down icon-transition" id="icon-${task.id}"></i>
+                                <div class="hidden sm:flex flex-col items-end gap-1 text-xs whitespace-nowrap">
+                                    <span class="px-2 py-1 bg-gray-50 text-gray-600 rounded border border-gray-100">Prog Q3: <b>${tarea.progQ3_tarea}</b></span>
+                                    <span class="px-2 py-1 bg-gray-50 text-gray-600 rounded border border-gray-100">Prog Q4: <b>${tarea.progQ4_tarea}</b></span>
                                 </div>
                             </div>
 
-                            <!-- Detalles Expandibles (Textos Largos) -->
-                            <div id="content-${task.id}" class="card-details bg-white">
-                                <div class="p-4 pl-6 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm border-t border-dashed border-gray-200 mx-4 bg-gray-50 rounded-b-lg">
-                                    <div>
-                                        <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-comment-alt text-gray-400"></i> Justificación / Observaciones</h5>
-                                        <p class="text-gray-600 leading-relaxed text-xs bg-white p-2 border border-gray-100 rounded h-full">${task.justificacion || '<i class="text-gray-400">Sin registro</i>'}</p>
-                                    </div>
-                                    <div>
-                                        <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-tools text-gray-400"></i> Acciones / Mitigación</h5>
-                                        <p class="text-gray-600 leading-relaxed text-xs bg-white p-2 border border-gray-100 rounded h-full">${task.acciones || '<i class="text-gray-400">Sin registro</i>'}</p>
-                                    </div>
-                                    <div>
-                                        <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-map-signs text-gray-400"></i> Plan de Contingencia</h5>
-                                        <p class="text-gray-600 leading-relaxed text-xs bg-white p-2 border border-gray-100 rounded h-full">${task.contingencia || '<i class="text-gray-400">Sin registro</i>'}</p>
-                                    </div>
+                            <!-- Cajas de Semáforos Secundarios -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                                <div class="p-2 rounded border ${colorMeta} text-xs flex flex-col justify-center">
+                                    <span class="font-bold uppercase opacity-75 text-[10px]">Afectación de Meta</span>
+                                    <span class="font-medium mt-0.5">${tarea.afectacionMeta || 'No registrado'}</span>
+                                </div>
+                                <div class="p-2 rounded border ${colorInd} text-xs flex flex-col justify-center">
+                                    <span class="font-bold uppercase opacity-75 text-[10px]">Afectación Indicador</span>
+                                    <span class="font-medium mt-0.5">${tarea.afectacionInd || 'No registrado'}</span>
+                                    ${tarea.indicadorAfectado !== 'No especificado' && tarea.afectacionInd.toLowerCase().includes('si') ? `<span class="italic mt-1 border-t border-current pt-1 block opacity-90">${tarea.indicadorAfectado}</span>` : ''}
+                                </div>
+                            </div>
+
+                            <!-- Nivel 3: Detalle Cualitativo -->
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
+                                <div class="text-xs">
+                                    <span class="font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-1"><i class="fas fa-comment-dots text-gray-400"></i> Justificación</span>
+                                    <p class="text-gray-700 bg-gray-50 p-2 rounded">${tarea.justificacion}</p>
+                                </div>
+                                <div class="text-xs">
+                                    <span class="font-bold text-blue-500 uppercase tracking-wide flex items-center gap-1 mb-1"><i class="fas fa-hammer text-blue-400"></i> Acciones Ejecutadas</span>
+                                    <p class="text-gray-700 bg-blue-50/50 p-2 rounded border border-blue-100">${tarea.acciones}</p>
+                                </div>
+                                <div class="text-xs">
+                                    <span class="font-bold text-orange-500 uppercase tracking-wide flex items-center gap-1 mb-1"><i class="fas fa-shield-alt text-orange-400"></i> Plan Contingencia</span>
+                                    <p class="text-gray-700 bg-orange-50/50 p-2 rounded border border-orange-100">${tarea.planContingencia}</p>
                                 </div>
                             </div>
                         </div>
                     `;
                 });
 
-                actCard.innerHTML = `
-                    <div class="bg-gray-50 p-4 border-b border-gray-200 cursor-pointer flex flex-col sm:flex-row justify-between sm:items-center hover:bg-gray-100 transition-colors gap-4" onclick="toggleActivity(${actIndex})">
-                        <div class="flex-grow pr-4">
-                            <span class="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest mb-1 block">ACTIVIDAD</span>
-                            <h3 class="text-base font-bold text-gray-900 leading-tight">${actividadNombre}</h3>
-                            <div class="mt-2 flex flex-wrap gap-2 items-center">
-                                <span class="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded">${tareas.length} Tareas</span>
-                                ${badgeAlert}
-                            </div>
+                html += `
                         </div>
-                        <div class="flex items-center gap-4 shrink-0">
-                            <div class="text-gray-500 bg-white p-2 rounded-full shadow-sm ml-2">
-                                <i class="fas fa-chevron-down icon-transition" id="act-icon-${actIndex}"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div id="act-content-${actIndex}" class="block">
-                        ${tareasHTML}
                     </div>
                 `;
-                
-                container.appendChild(actCard);
+                divActividad.innerHTML = html;
+                contenedor.appendChild(divActividad);
+            });
+
+            // Manejo de estado vacío
+            const divVacio = document.getElementById('estado-vacio');
+            if (acordeonesVisibles === 0) {
+                divVacio.classList.remove('hidden');
+            } else {
+                divVacio.classList.add('hidden');
             }
         }
+
+        // 7. FUNCIONES AUXILIARES: Acordeón, Filtros y Búsqueda
+        function toggleAccordion(contentId, iconId) {
+            const content = document.getElementById(contentId);
+            const icon = document.getElementById(iconId);
+            content.classList.toggle('open');
+            icon.classList.toggle('rotate-180');
+        }
+
+        function filtrarPorColor(color) {
+            filtroActual = color;
+            actualizarBotonesFiltro();
+            renderizarJerarquia();
+        }
+
+        function actualizarBotonesFiltro() {
+            // Reiniciar botones
+            const botones = document.querySelectorAll('.filtro-btn');
+            botones.forEach(btn => {
+                btn.classList.remove('ring-2', 'ring-offset-2', 'ring-blue-500', 'bg-opacity-100');
+                if(btn.id !== 'btn-filtro-todos') btn.classList.add('opacity-70'); // Atenuar inactivos
+            });
+
+            // Activar seleccionado
+            const btnActivo = document.getElementById(`btn-filtro-${filtroActual}`);
+            if (btnActivo) {
+                btnActivo.classList.add('ring-2', 'ring-offset-2', 'ring-blue-500', 'opacity-100');
+                btnActivo.classList.remove('opacity-70');
+            }
+            
+            // Logica visual especial para boton "Todos"
+            if(filtroActual === 'todos') {
+                document.getElementById('btn-filtro-todos').classList.replace('bg-gray-800', 'bg-blue-600');
+                document.getElementById('btn-filtro-todos').classList.replace('text-white', 'text-white');
+            } else {
+                document.getElementById('btn-filtro-todos').classList.replace('bg-blue-600', 'bg-gray-200');
+                document.getElementById('btn-filtro-todos').classList.replace('text-white', 'text-gray-700');
+            }
+        }
+
+        // Listener para Búsqueda en Vivo
+        document.getElementById('buscador').addEventListener('input', function() {
+            renderizarJerarquia();
+        });
+
     </script>
 </body>
 </html>
