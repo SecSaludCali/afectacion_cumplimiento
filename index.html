@@ -46,6 +46,12 @@
         /* Ocultar barra de scroll pero permitir deslizamiento */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Estilos para el scroll vertical de las tareas */
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body class="text-gray-800 antialiased min-h-screen flex flex-col">
@@ -403,105 +409,58 @@
                     const semaforoInfo = clasificarSemaforoTarea(tarea.afectacionTarea);
                     const pasaFiltroColor = (filtroActual === 'todos') || (semaforoInfo.categoria === filtroActual);
                     
-                    // Filtro de Búsqueda
-                    const textoBusqueda = `${actividad.nombre} ${tarea.tarea} ${tarea.justificacion}`.toLowerCase();
-                    const pasaFiltroBusqueda = terminoBusqueda === '' || textoBusqueda.includes(terminoBusqueda);
-
-                    return pasaFiltroColor && pasaFiltroBusqueda;
-                });
-
-                // Si no hay tareas después de filtrar, no renderizamos esta actividad
-                if (tareasFiltradas.length === 0) return;
-                
-                acordeonesVisibles++;
-
-                // B. Construir HTML Nivel 1 (Actividad - Cabecera del Acordeón)
-                const divActividad = document.createElement('div');
-                divActividad.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300';
-                
-                // Cabecera Actividad
-                let html = `
-                    <div class="p-5 bg-gray-50 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 cursor-pointer hover:bg-gray-100 transition-colors" onclick="toggleAccordion('acordeon-${indexActividad}', 'icono-${indexActividad}')">
-                        <div class="flex-1 flex items-start gap-3">
-                            <i id="icono-${indexActividad}" class="fas fa-chevron-down mt-1 text-gray-400 icon-rotate rotate-180"></i>
-                            <div>
-                                <span class="text-xs font-bold text-blue-600 uppercase tracking-wide">Actividad Macro</span>
-                                <h3 class="text-base font-bold text-gray-800 leading-snug mt-1">${actividad.nombre}</h3>
-                                <p class="text-xs text-gray-500 mt-1">${tareasFiltradas.length} Tareas listadas</p>
-                            </div>
-                        </div>
-                        
-                        <!-- Bloque de Cantidades Programadas -->
-                        <div class="flex gap-4 border-l-2 border-gray-200 pl-4">
-                            <div class="text-center">
-                                <p class="text-[10px] text-gray-500 font-bold uppercase">Prog. Q3</p>
-                                <p class="text-lg font-bold text-gray-800">${actividad.progQ3}</p>
-                            </div>
-                            <div class="text-center">
-                                <p class="text-[10px] text-gray-500 font-bold uppercase">Prog. Q4</p>
-                                <p class="text-lg font-bold text-gray-800">${actividad.progQ4}</p>
-                            </div>
-                            <div class="text-center bg-yellow-50 px-3 rounded-lg border border-yellow-100">
-                                <p class="text-[10px] text-yellow-700 font-bold uppercase">Reprog. Q4</p>
-                                <p class="text-lg font-bold text-yellow-700">${actividad.reprogQ4}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Nivel 2: Contenedor de Tareas (Acordeón desplegable) -->
-                    <div id="acordeon-${indexActividad}" class="accordion-content open bg-white">
-                        <div class="p-5 border-t border-gray-100 space-y-4">
+                    <!-- Nivel 2: Contenedor de Tareas (Ahora como lista vertical con scroll) -->
+                    <div id="acordeon-${indexActividad}" class="accordion-content open bg-gray-50/50">
+                        <div class="p-6 border-t border-gray-200">
+                            <!-- Contenedor con límite de altura y scroll vertical -->
+                            <div class="max-h-[500px] overflow-y-auto pr-4 space-y-4 custom-scrollbar">
                 `;
 
-                // C. Construir HTML Nivel 2 y 3 (Tarjetas de Tareas)
+                // C. Construir HTML Nivel 2 y 3 (Tarjetas de Tareas en Cascada)
                 tareasFiltradas.forEach((tarea, indexTarea) => {
                     const semaforoTarea = clasificarSemaforoTarea(tarea.afectacionTarea);
                     const colorMeta = getColorBinario(tarea.afectacionMeta);
                     const colorInd = getColorBinario(tarea.afectacionInd);
 
                     html += `
-                        <div class="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors bg-white">
+                        <div class="border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-colors bg-white shadow-sm flex flex-col">
                             
                             <!-- Tarea Header -->
                             <div class="flex justify-between items-start gap-4 mb-4">
                                 <div class="flex-1">
-                                    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold shadow-sm mb-2 ${semaforoTarea.color}">
+                                    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold shadow-sm mb-3 ${semaforoTarea.color}">
                                         ${semaforoTarea.label}
                                     </span>
-                                    <p class="text-sm font-semibold text-gray-800">${tarea.tarea}</p>
-                                </div>
-                                <div class="hidden sm:flex flex-col items-end gap-1 text-xs whitespace-nowrap">
-                                    <span class="px-2 py-1 bg-gray-50 text-gray-600 rounded border border-gray-100">Prog Q3: <b>${tarea.progQ3_tarea}</b></span>
-                                    <span class="px-2 py-1 bg-gray-50 text-gray-600 rounded border border-gray-100">Prog Q4: <b>${tarea.progQ4_tarea}</b></span>
+                                    <p class="text-sm font-semibold text-gray-800 leading-relaxed">${tarea.tarea}</p>
                                 </div>
                             </div>
 
                             <!-- Cajas de Semáforos Secundarios -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                                <div class="p-2 rounded border ${colorMeta} text-xs flex flex-col justify-center">
+                                <div class="p-3 rounded border ${colorMeta} text-xs flex flex-col justify-center">
                                     <span class="font-bold uppercase opacity-75 text-[10px]">Afectación de Meta</span>
-                                    <span class="font-medium mt-0.5">${tarea.afectacionMeta || 'No registrado'}</span>
+                                    <span class="font-medium mt-1">${tarea.afectacionMeta || 'No registrado'}</span>
                                 </div>
-                                <div class="p-2 rounded border ${colorInd} text-xs flex flex-col justify-center">
+                                <div class="p-3 rounded border ${colorInd} text-xs flex flex-col justify-center">
                                     <span class="font-bold uppercase opacity-75 text-[10px]">Afectación Indicador</span>
-                                    <span class="font-medium mt-0.5">${tarea.afectacionInd || 'No registrado'}</span>
-                                    ${tarea.indicadorAfectado !== 'No especificado' && tarea.afectacionInd.toLowerCase().includes('si') ? `<span class="italic mt-1 border-t border-current pt-1 block opacity-90">${tarea.indicadorAfectado}</span>` : ''}
+                                    <span class="font-medium mt-1">${tarea.afectacionInd || 'No registrado'}</span>
+                                    ${tarea.indicadorAfectado !== 'No especificado' && tarea.afectacionInd.toLowerCase().includes('si') ? `<span class="italic mt-1.5 border-t border-current pt-1.5 block opacity-90">${tarea.indicadorAfectado}</span>` : ''}
                                 </div>
                             </div>
 
                             <!-- Nivel 3: Detalle Cualitativo -->
-                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-100">
-                                <div class="text-xs">
-                                    <span class="font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-1"><i class="fas fa-comment-dots text-gray-400"></i> Justificación</span>
-                                    <p class="text-gray-700 bg-gray-50 p-2 rounded">${tarea.justificacion}</p>
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-auto pt-4 border-t border-gray-100 flex-1">
+                                <div class="text-xs flex flex-col">
+                                    <span class="font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-2"><i class="fas fa-comment-dots text-gray-400"></i> Justificación</span>
+                                    <p class="text-gray-700 bg-gray-50 p-2.5 rounded h-full">${tarea.justificacion}</p>
                                 </div>
-                                <div class="text-xs">
-                                    <span class="font-bold text-blue-500 uppercase tracking-wide flex items-center gap-1 mb-1"><i class="fas fa-hammer text-blue-400"></i> Acciones Ejecutadas</span>
-                                    <p class="text-gray-700 bg-blue-50/50 p-2 rounded border border-blue-100">${tarea.acciones}</p>
+                                <div class="text-xs flex flex-col">
+                                    <span class="font-bold text-blue-500 uppercase tracking-wide flex items-center gap-1 mb-2"><i class="fas fa-hammer text-blue-400"></i> Acciones Ejecutadas</span>
+                                    <p class="text-gray-700 bg-blue-50/50 p-2.5 rounded border border-blue-100 h-full">${tarea.acciones}</p>
                                 </div>
-                                <div class="text-xs">
-                                    <span class="font-bold text-orange-500 uppercase tracking-wide flex items-center gap-1 mb-1"><i class="fas fa-shield-alt text-orange-400"></i> Plan Contingencia</span>
-                                    <p class="text-gray-700 bg-orange-50/50 p-2 rounded border border-orange-100">${tarea.planContingencia}</p>
+                                <div class="text-xs flex flex-col">
+                                    <span class="font-bold text-orange-500 uppercase tracking-wide flex items-center gap-1 mb-2"><i class="fas fa-shield-alt text-orange-400"></i> Plan Contingencia</span>
+                                    <p class="text-gray-700 bg-orange-50/50 p-2.5 rounded border border-orange-100 h-full">${tarea.planContingencia}</p>
                                 </div>
                             </div>
                         </div>
@@ -509,6 +468,7 @@
                 });
 
                 html += `
+                            </div>
                         </div>
                     </div>
                 `;
