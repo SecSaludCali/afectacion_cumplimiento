@@ -433,6 +433,40 @@
                     const semaforoInfo = clasificarSemaforoTarea(tarea.afectacionTarea);
                     const pasaFiltroColor = (filtroActual === 'todos') || (semaforoInfo.categoria === filtroActual);
                     
+                    // Filtro de Búsqueda
+                    const pasaBusqueda = (terminoBusqueda === '') || 
+                                         (tarea.tarea.toLowerCase().includes(terminoBusqueda)) ||
+                                         (actividad.nombre.toLowerCase().includes(terminoBusqueda));
+
+                    return pasaFiltroColor && pasaBusqueda;
+                });
+
+                // Si la actividad no tiene tareas que cumplan el filtro, no la renderizamos
+                if (tareasFiltradas.length === 0) return;
+                
+                acordeonesVisibles++;
+
+                // B. Construir HTML Nivel 1 (Actividad Macro)
+                const divActividad = document.createElement('div');
+                divActividad.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden';
+                
+                let html = `
+                    <!-- Nivel 1: Header Actividad -->
+                    <div class="p-5 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors" onclick="toggleAccordion('acordeon-${indexActividad}', 'icono-${indexActividad}')">
+                        <div class="flex-1 pr-4">
+                            <h3 class="text-lg font-bold text-gray-900 leading-snug">${actividad.nombre}</h3>
+                            <div class="mt-2 flex gap-4 text-sm text-gray-600">
+                                <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200"><i class="fas fa-bullseye text-gray-400"></i> Prog Q3: <strong class="text-gray-800">${actividad.progQ3}</strong></span>
+                                <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200"><i class="fas fa-bullseye text-gray-400"></i> Prog Q4: <strong class="text-gray-800">${actividad.progQ4}</strong></span>
+                                <span class="bg-blue-50 px-2 py-1 rounded border border-blue-100 text-blue-700"><i class="fas fa-sync-alt text-blue-400"></i> Reprog Q3: <strong>${actividad.reprogQ3}</strong></span>
+                                <span class="bg-blue-50 px-2 py-1 rounded border border-blue-100 text-blue-700"><i class="fas fa-sync-alt text-blue-400"></i> Reprog Q4: <strong>${actividad.reprogQ4}</strong></span>
+                            </div>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0">
+                            <i id="icono-${indexActividad}" class="fas fa-chevron-down icon-rotate rotate-180 text-xl"></i>
+                        </div>
+                    </div>
+
                     <!-- Nivel 2: Contenedor de Tareas (Ahora como lista vertical con scroll) -->
                     <div id="acordeon-${indexActividad}" class="accordion-content open bg-gray-50/50">
                         <div class="p-6 border-t border-gray-200">
