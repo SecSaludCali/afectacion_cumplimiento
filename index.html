@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Afectación por Emergencia</title>
+    
+    <!-- Tailwind CSS para diseño rápido y moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PapaParse para procesar el CSV desde la URL de Google Sheets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    
+    <!-- Chart.js para los gráficos de resumen -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- FontAwesome para íconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Configuración personalizada de colores en Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'semaforo-verde': '#00b050',
+                        'semaforo-amarillo': '#ffff00',
+                        'semaforo-rojo': '#c00000',
+                        'semaforo-morado': '#7030a0',
+                        'semaforo-cian': '#00d2ff',
+                        'semaforo-meta-verde': '#1e8449',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Estilos personalizados para animaciones y detalles de UI */
+        body { background-color: #f3f4f6; }
+        .card-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .card-details.open {
+            max-height: 1000px; /* Suficiente espacio para el contenido */
+            transition: max-height 0.5s ease-in;
+        }
+        .rotate-180 { transform: rotate(180deg); }
+        .icon-transition { transition: transform 0.3s ease; }
+        
+        /* Ocultar barra de desplazamiento para limpieza visual pero permitir scroll */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-gray-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Navbar / Header -->
+    <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-600 text-white p-2 rounded-lg">
+                        <i class="fas fa-shield-alt text-xl"></i>
+                    </div>
+                    <h1 class="text-xl font-bold text-gray-900 tracking-tight">Monitor de Contingencias</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="document.getElementById('configModal').classList.remove('hidden')" class="text-gray-500 hover:text-blue-600 transition-colors" title="Configurar conexión a Google Sheets">
+                        <i class="fas fa-cog text-xl"></i>
+                    </button>
+                    <button id="refreshBtn" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2">
+                        <i class="fas fa-sync-alt"></i> Actualizar Datos
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Modal de Configuración (Google Sheets URL) -->
+    <div id="configModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-[100] flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 m-4 transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-900">Conectar a Google Sheets</h3>
+                <button onclick="document.getElementById('configModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="mb-4">
+                <p class="text-sm text-gray-600 mb-3">
+                    Para conectar en vivo, debes publicar tu Google Sheet como CSV:
+                </p>
+                <ol class="list-decimal list-inside text-xs text-gray-500 space-y-1 mb-4 bg-gray-50 p-3 rounded-md border border-gray-100">
+                    <li>Abre tu documento de Google Sheets.</li>
+                    <li>Ve a <strong>Archivo</strong> > <strong>Compartir</strong> > <strong>Publicar en la web</strong>.</li>
+                    <li>Selecciona "Todo el documento" y formato <strong>Valores separados por comas (.csv)</strong>.</li>
+                    <li>Copia el enlace generado y pégalo abajo.</li>
+                </ol>
+                <label class="block text-sm font-medium text-gray-700 mb-1">URL Pública del CSV</label>
+                <input type="text" id="sheetsUrl" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2 border text-sm" placeholder="https://docs.google.com/spreadsheets/d/e/2PACX.../pub?output=csv">
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="document.getElementById('configModal').classList.add('hidden')" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Cancelar</button>
+                <button onclick="saveUrlAndLoad()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm">Guardar y Cargar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido Principal -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-6">
+        
+        <!-- Estado de carga -->
+        <div id="loadingState" class="hidden flex flex-col items-center justify-center py-20">
+            <i class="fas fa-circle-notch fa-spin text-4xl text-blue-500 mb-4"></i>
+            <p class="text-gray-500 font-medium">Obteniendo datos en vivo desde Google Sheets...</p>
+        </div>
+
+        <!-- Mensaje Inicial -->
+        <div id="emptyState" class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+            <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-satellite-dish text-3xl text-blue-500"></i>
+            </div>
+            <h2 class="text-xl font-bold text-gray-900 mb-2">Aún no hay datos conectados</h2>
+            <p class="text-gray-500 mb-6 max-w-md mx-auto">Configura la URL pública de tu matriz en Google Sheets para empezar a visualizar el impacto de la emergencia en tiempo real.</p>
+            <button onclick="document.getElementById('configModal').classList.remove('hidden')" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg shadow-sm hover:bg-blue-700 font-medium transition-all">
+                Conectar Datos Ahora
+            </button>
+        </div>
+
+        <!-- Dashboard Content (Oculto hasta que carguen datos) -->
+        <div id="dashboardContent" class="hidden space-y-6">
+            
+            <!-- Contexto del Proyecto -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-wrap gap-6 items-center justify-between">
+                <div>
+                    <h2 id="metaProyecto" class="text-2xl font-extrabold text-gray-900 leading-tight">Nombre del Proyecto</h2>
+                    <p id="metaSubsecretaria" class="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                        <i class="fas fa-sitemap"></i> Subsecretaría...
+                    </p>
+                </div>
+                <div class="flex gap-6 border-l border-gray-200 pl-6">
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase font-semibold tracking-wider">Emergencia</p>
+                        <p id="metaEmergencia" class="font-medium text-gray-800">No especificada</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase font-semibold tracking-wider">Fecha Reporte</p>
+                        <p id="metaFecha" class="font-medium text-gray-800">--/--/----</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPIs (Key Performance Indicators) -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xl">
+                        <i class="fas fa-list-check"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Total Tareas Evaluadas</p>
+                        <p id="kpiTotal" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Afectación Alta</p>
+                        <div class="flex items-baseline gap-2">
+                            <p id="kpiAfectacionAlta" class="text-2xl font-bold text-red-600">0</p>
+                            <p class="text-xs text-gray-400">tareas detenidas</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4 border-b-4 border-b-red-500">
+                    <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-xl">
+                        <i class="fas fa-bullseye"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Impacto en Metas</p>
+                        <div class="flex items-baseline gap-2">
+                            <p id="kpiMetasAfectadas" class="text-2xl font-bold text-gray-900">0</p>
+                            <p class="text-xs text-gray-400">tareas afectan metas</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-xl">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Impacto Indicadores</p>
+                        <div class="flex items-baseline gap-2">
+                            <p id="kpiIndicadoresAfectados" class="text-2xl font-bold text-gray-900">0</p>
+                            <p class="text-xs text-gray-400">tareas afectan ind.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Layout Principal: Gráficos + Listado -->
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                
+                <!-- Columna Izquierda: Gráficos y Filtros -->
+                <div class="xl:col-span-1 space-y-6">
+                    
+                    <!-- Gráfico: Estado de Tareas -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                        <h3 class="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wider">Estado Global de Tareas</h3>
+                        <div class="relative h-48 w-full flex justify-center">
+                            <canvas id="chartAfectacion"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Filtros de Navegación -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 sticky top-24">
+                        <h3 class="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wider">Filtros Rápidos</h3>
+                        <div class="space-y-2">
+                            <button onclick="applyFilter('all')" class="w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors bg-blue-50 text-blue-700 border border-blue-100" id="btn-filter-all">
+                                <i class="fas fa-layer-group w-5"></i> Ver Todo
+                            </button>
+                            <button onclick="applyFilter('afectacion-alta')" class="w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-gray-50 text-gray-600" id="btn-filter-alta">
+                                <i class="fas fa-circle text-semaforo-rojo w-5"></i> Solo Afectación Alta
+                            </button>
+                            <button onclick="applyFilter('afectacion-parcial')" class="w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-gray-50 text-gray-600" id="btn-filter-parcial">
+                                <i class="fas fa-circle text-yellow-400 w-5"></i> Afectación Parcial
+                            </button>
+                            <button onclick="applyFilter('metas-afectadas')" class="w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-gray-50 text-gray-600" id="btn-filter-metas">
+                                <i class="fas fa-bullseye text-red-500 w-5"></i> Afectan Metas de Proyecto
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Tarjetas de Tareas -->
+                <div class="xl:col-span-2">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-4 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-gray-900">Listado de Tareas Evaluadas</h3>
+                        <span id="tareasCount" class="bg-gray-100 text-gray-600 py-1 px-3 rounded-full text-xs font-semibold">0 tareas mostradas</span>
+                    </div>
+
+                    <!-- Contenedor de Tarjetas -->
+                    <div id="cardsContainer" class="space-y-4">
+                        <!-- Las tarjetas se inyectan dinámicamente aquí mediante JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Variables Globales
+        let rawData = [];
+        let parsedTasks = [];
+        let currentFilter = 'all';
+        let chartInstance = null;
+
+        // Configuración Inicial con la URL proporcionada
+        const DEFAULT_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR-A_QjLWSri4tam1_5359GJotzRd40HTRgjwBtbrDYYREcZdoUWWlVvhJHkC6-R0AOo9i_50s9FyaR/pub?output=csv';
+        
+        // Al iniciar, cargamos los datos de la URL por defecto si no hay una en local storage
+        const savedUrl = localStorage.getItem('sheetsUrl');
+        const urlToLoad = savedUrl || DEFAULT_URL;
+        
+        document.getElementById('sheetsUrl').value = urlToLoad;
+        
+        // Iniciar carga automáticamente
+        window.addEventListener('DOMContentLoaded', (event) => {
+             loadDataFromGoogleSheets(urlToLoad);
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            const url = document.getElementById('sheetsUrl').value.trim() || DEFAULT_URL;
+            loadDataFromGoogleSheets(url);
+        });
+
+        function saveUrlAndLoad() {
+            const url = document.getElementById('sheetsUrl').value.trim();
+            if (!url) return alert("Por favor ingresa una URL válida.");
+            localStorage.setItem('sheetsUrl', url);
+            document.getElementById('configModal').classList.add('hidden');
+            loadDataFromGoogleSheets(url);
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingState').style.display = show ? 'flex' : 'none';
+            if (show) {
+                document.getElementById('emptyState').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'none';
+            }
+        }
+
+        function loadDataFromGoogleSheets(url) {
+            showLoading(true);
+            Papa.parse(url, {
+                download: true,
+                header: false, // Leemos crudo para manejar los metadatos primero
+                complete: function(results) {
+                    rawData = results.data;
+                    processData(rawData);
+                },
+                error: function(err) {
+                    showLoading(false);
+                    alert("Error al cargar los datos. Verifica que la URL sea un CSV público válido de Google Sheets.\nDetalles: " + err);
+                    document.getElementById('emptyState').style.display = 'block';
+                }
+            });
+        }
+
+        function processData(data) {
+            if (!data || data.length === 0) return;
+
+            let headerRowIndex = -1;
+            let metadata = { proyecto: '', subsecretaria: '', emergencia: '', fecha: '' };
+
+            // 1. Extraer Metadatos y encontrar cabecera real
+            for (let i = 0; i < Math.min(20, data.length); i++) {
+                const row = data[i];
+                
+                // Buscar cabecera de tabla
+                if (row.some(cell => typeof cell === 'string' && (cell.includes('TAREA') || cell.includes('ACTIVIDAD')))) {
+                    headerRowIndex = i;
+                }
+
+                // Extraer metadatos basándonos en tu estructura
+                row.forEach((cell, idx) => {
+                    if (typeof cell === 'string') {
+                        if (cell.includes('NOMBRE DEL PROYECTO:')) metadata.proyecto = row[idx + 1] || 'No definido';
+                        if (cell.includes('SUBSECRETARÍA')) metadata.subsecretaria = cell;
+                        if (cell.includes('EMERGENCIA:')) metadata.emergencia = row[idx + 1] || 'No definido';
+                        if (cell.includes('FECHA DE DILIGENCIAMIENTO:') || cell.includes('FECHA:')) metadata.fecha = row[idx + 1] || 'No definido';
+                    }
+                });
+                
+                if (headerRowIndex !== -1) break;
+            }
+
+            if (headerRowIndex === -1) {
+                showLoading(false);
+                alert("No se pudo identificar la tabla de datos principal. Asegúrate de que existe una columna 'TAREA' o 'ACTIVIDAD'.");
+                return;
+            }
+
+            // Actualizar UI con metadatos
+            document.getElementById('metaProyecto').textContent = metadata.proyecto || 'Proyecto sin nombre';
+            document.getElementById('metaSubsecretaria').innerHTML = `<i class="fas fa-sitemap"></i> ${metadata.subsecretaria || 'Dependencia no especificada'}`;
+            document.getElementById('metaEmergencia').textContent = metadata.emergencia || '--';
+            document.getElementById('metaFecha').textContent = metadata.fecha || '--';
+
+            // 2. Procesar Filas de Tareas
+            const headers = data[headerRowIndex].map(h => typeof h === 'string' ? h.trim() : '');
+            
+            // Identificar índices clave
+            const idxActividad = Math.max(headers.findIndex(h => h.includes('ACTIVIDAD')), 0);
+            const idxTarea = Math.max(headers.findIndex(h => h.includes('TAREA')), 1);
+            
+            // Buscar columnas de semáforos por texto o asumir posiciones si falla
+            let idxSemaforo1 = headers.findIndex(h => h.includes('NIVEL DE AFECTACIÓN') && !h.includes('INDICADORES'));
+            if(idxSemaforo1 === -1) idxSemaforo1 = 4; // Fallback
+            
+            let idxSemaforo2 = headers.findIndex(h => h.includes('META'));
+            if(idxSemaforo2 === -1) idxSemaforo2 = 5;
+            
+            let idxSemaforo3 = headers.findIndex(h => h.includes('INDICADORES'));
+            if(idxSemaforo3 === -1) idxSemaforo3 = 6;
+
+            let idxJustificacion = headers.findIndex(h => h.includes('JUSTIFICACIÓN'));
+            if(idxJustificacion === -1) idxJustificacion = 8;
+
+            let idxAcciones = headers.findIndex(h => h.includes('ACCIONES EJECUTADAS'));
+            if(idxAcciones === -1) idxAcciones = 9;
+
+            let idxContingencia = headers.findIndex(h => h.includes('PLAN DE CONTINGENCIA'));
+            if(idxContingencia === -1) idxContingencia = 10;
+
+            // Filtrar filas de datos reales
+            parsedTasks = [];
+            const dataRows = data.slice(headerRowIndex + 1);
+            
+            dataRows.forEach((row, i) => {
+                // Ignorar filas totalmente vacías
+                if (!row.some(cell => typeof cell === 'string' && cell.trim() !== '')) return;
+                
+                // Asegurarse de que al menos haya una tarea o afectación registrada
+                const tarea = row[idxTarea] || '';
+                const afect = row[idxSemaforo1] || '';
+                if(tarea === '' && afect === '') return;
+
+                parsedTasks.push({
+                    id: i,
+                    actividad: row[idxActividad] || 'Actividad General',
+                    tarea: tarea,
+                    afectacionTarea: afect,
+                    afectacionMeta: row[idxSemaforo2] || '',
+                    afectacionIndicador: row[idxSemaforo3] || '',
+                    justificacion: row[idxJustificacion] || 'Sin registro',
+                    acciones: row[idxAcciones] || 'Sin registro',
+                    contingencia: row[idxContingencia] || 'Sin registro'
+                });
+            });
+
+            showLoading(false);
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('dashboardContent').style.display = 'block';
+            
+            updateDashboard();
+        }
+
+        // Helpers para colores basados en los textos de tu matriz
+        function getBadgeInfo(text, type) {
+            const t = (text || '').toLowerCase();
+            if (!t) return { color: 'bg-gray-100 text-gray-600', icon: 'fa-minus', text: 'No Evaluado' };
+
+            if (type === 'tarea') {
+                if (t.includes('sin afectación')) return { color: 'bg-semaforo-verde text-white', icon: 'fa-check-circle', text: text };
+                if (t.includes('afectación parcial')) return { color: 'bg-semaforo-amarillo text-black', icon: 'fa-exclamation-circle', text: text };
+                if (t.includes('afectación alta')) return { color: 'bg-semaforo-rojo text-white', icon: 'fa-times-circle', text: text };
+                if (t.includes('no aplica')) return { color: 'bg-semaforo-morado text-white', icon: 'fa-ban', text: text };
+                if (t.includes('sobre-ejecución') || t.includes('sobre ejecución')) return { color: 'bg-semaforo-cian text-black', icon: 'fa-arrow-up', text: text };
+            } 
+            else if (type === 'meta' || type === 'indicador') {
+                if (t.includes('no afecta')) return { color: 'bg-semaforo-meta-verde text-white', icon: 'fa-check', text: text };
+                if (t.includes('si afecta') || t.includes('sí afecta')) return { color: 'bg-semaforo-rojo text-white', icon: 'fa-exclamation-triangle', text: text };
+            }
+            return { color: 'bg-gray-100 text-gray-800', icon: 'fa-info-circle', text: text };
+        }
+
+        function updateDashboard() {
+            // Calcular KPIs
+            const total = parsedTasks.length;
+            const altas = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta')).length;
+            const metasAfec = parsedTasks.filter(t => (t.afectacionMeta || '').toLowerCase().includes('si afecta')).length;
+            const indAfec = parsedTasks.filter(t => (t.afectacionIndicador || '').toLowerCase().includes('si afecta')).length;
+
+            document.getElementById('kpiTotal').textContent = total;
+            document.getElementById('kpiAfectacionAlta').textContent = altas;
+            document.getElementById('kpiMetasAfectadas').textContent = metasAfec;
+            document.getElementById('kpiIndicadoresAfectados').textContent = indAfec;
+
+            updateChart();
+            renderCards();
+        }
+
+        function updateChart() {
+            const ctx = document.getElementById('chartAfectacion').getContext('2d');
+            
+            const counts = {
+                'Sin Afectación': 0, 'Parcial': 0, 'Alta': 0, 'No Aplica': 0, 'Sobre-ejecución': 0
+            };
+
+            parsedTasks.forEach(t => {
+                const val = (t.afectacionTarea || '').toLowerCase();
+                if(val.includes('sin afectación')) counts['Sin Afectación']++;
+                else if(val.includes('parcial')) counts['Parcial']++;
+                else if(val.includes('alta')) counts['Alta']++;
+                else if(val.includes('no aplica')) counts['No Aplica']++;
+                else if(val.includes('sobre')) counts['Sobre-ejecución']++;
+            });
+
+            if(chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(counts),
+                    datasets: [{
+                        data: Object.values(counts),
+                        backgroundColor: ['#00b050', '#ffff00', '#c00000', '#7030a0', '#00d2ff'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        function applyFilter(filterType) {
+            currentFilter = filterType;
+            
+            // Resetear estilos de botones
+            const buttons = ['all', 'alta', 'parcial', 'metas'];
+            buttons.forEach(b => {
+                const btn = document.getElementById(`btn-filter-${b}`);
+                btn.className = "w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors hover:bg-gray-50 text-gray-600";
+            });
+
+            // Estilo activo
+            const activeBtn = document.getElementById(`btn-filter-${filterType.split('-')[0] === 'afectacion' ? filterType.split('-')[1] : filterType.split('-')[0]}`);
+            if(activeBtn) {
+                activeBtn.className = "w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors bg-blue-50 text-blue-700 border border-blue-100";
+            } else if (filterType === 'all') {
+                 document.getElementById(`btn-filter-all`).className = "w-full text-left px-4 py-2 rounded-md text-sm font-medium transition-colors bg-blue-50 text-blue-700 border border-blue-100";
+            }
+
+            renderCards();
+        }
+
+        function toggleCard(id) {
+            const content = document.getElementById(`content-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            content.classList.toggle('open');
+            icon.classList.toggle('rotate-180');
+        }
+
+        function renderCards() {
+            const container = document.getElementById('cardsContainer');
+            container.innerHTML = '';
+
+            // Filtrar datos
+            let filteredData = parsedTasks;
+            if (currentFilter === 'afectacion-alta') {
+                filteredData = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta'));
+            } else if (currentFilter === 'afectacion-parcial') {
+                filteredData = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('parcial'));
+            } else if (currentFilter === 'metas-afectadas') {
+                filteredData = parsedTasks.filter(t => (t.afectacionMeta || '').toLowerCase().includes('si afecta'));
+            }
+
+            document.getElementById('tareasCount').textContent = `${filteredData.length} tareas mostradas`;
+
+            if (filteredData.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                        <i class="fas fa-search text-3xl text-gray-300 mb-3"></i>
+                        <p class="text-gray-500">No hay tareas que coincidan con este filtro.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filteredData.forEach(task => {
+                const infoTarea = getBadgeInfo(task.afectacionTarea, 'tarea');
+                const infoMeta = getBadgeInfo(task.afectacionMeta, 'meta');
+                const infoInd = getBadgeInfo(task.afectacionIndicador, 'indicador');
+
+                // Card HTML
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow";
+                
+                card.innerHTML = `
+                    <!-- Cabecera de la tarjeta (Siempre visible) -->
+                    <div class="p-5 cursor-pointer flex flex-col md:flex-row md:items-start justify-between gap-4" onclick="toggleCard(${task.id})">
+                        <div class="flex-grow">
+                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 block">${task.actividad}</span>
+                            <h4 class="text-base font-semibold text-gray-900 leading-snug">${task.tarea}</h4>
+                            
+                            <!-- Badges (Semáforos) inline -->
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${infoTarea.color}">
+                                    <i class="fas ${infoTarea.icon}"></i> Tarea: ${infoTarea.text.split(':')[0]} <!-- Mostramos solo la primera parte para que sea corto -->
+                                </span>
+                                ${(infoMeta.text && infoMeta.text.toLowerCase().includes('afecta')) ? 
+                                    `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${infoMeta.color} opacity-90 border border-black/10">
+                                        <i class="fas ${infoMeta.icon}"></i> Meta
+                                    </span>` : ''}
+                                ${(infoInd.text && infoInd.text.toLowerCase().includes('afecta')) ? 
+                                    `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${infoInd.color} opacity-90 border border-black/10">
+                                        <i class="fas ${infoInd.icon}"></i> Indicador
+                                    </span>` : ''}
+                            </div>
+                        </div>
+                        <div class="text-gray-400 shrink-0 self-center md:self-start pt-2">
+                            <i class="fas fa-chevron-down icon-transition" id="icon-${task.id}"></i>
+                        </div>
+                    </div>
+
+                    <!-- Cuerpo Expandible (Detalles textuales) -->
+                    <div id="content-${task.id}" class="card-details bg-gray-50 border-t border-gray-100">
+                        <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                            <div>
+                                <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-2"><i class="fas fa-comment-alt text-gray-400"></i> Justificación</h5>
+                                <p class="text-gray-600 whitespace-pre-wrap leading-relaxed">${task.justificacion}</p>
+                            </div>
+                            <div>
+                                <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-2"><i class="fas fa-tools text-gray-400"></i> Acciones Ejecutadas</h5>
+                                <p class="text-gray-600 whitespace-pre-wrap leading-relaxed">${task.acciones}</p>
+                            </div>
+                            <div>
+                                <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-2"><i class="fas fa-map-signs text-gray-400"></i> Plan Contingencia</h5>
+                                <p class="text-gray-600 whitespace-pre-wrap leading-relaxed">${task.contingencia}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
