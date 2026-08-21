@@ -67,6 +67,9 @@
                     <h1 class="text-xl font-bold text-gray-900 tracking-tight">Monitor de Contingencias</h1>
                 </div>
                 <div id="nav-actions" class="hidden flex gap-4 items-center">
+                    <button type="button" id="btn-actualizar" onclick="refrescarDatos()" class="text-sm font-medium text-gray-500 hover:text-green-600 transition-colors flex items-center gap-2" title="Actualizar datos desde Sheets">
+                        <i id="icono-actualizar" class="fas fa-sync-alt"></i> Actualizar
+                    </button>
                     <button type="button" onclick="volverAlInicio()" class="text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors flex items-center gap-2">
                         <i class="fas fa-home"></i> Inicio
                     </button>
@@ -137,7 +140,7 @@
                 <h2 id="dash-proyecto" class="text-2xl font-bold text-gray-900 leading-tight">Nombre del Proyecto</h2>
                 <p id="dash-responsable" class="text-sm text-gray-500 mt-1">Responsable: --</p>
             </div>
-            <div class="flex flex-wrap gap-4 text-sm text-right">
+            <div class="flex flex-col sm:flex-row gap-4 text-sm text-left sm:text-right">
                 <div class="bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
                     <p class="text-xs text-gray-400 font-semibold uppercase">Emergencia</p>
                     <p id="dash-emergencia" class="font-medium text-gray-800">--</p>
@@ -189,8 +192,8 @@
             </div>
 
             <!-- Filtros por Color (Semáforo Tarea) -->
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="text-xs font-semibold text-gray-500 mr-2 uppercase tracking-wide">Filtros Rápidos:</span>
+            <div class="flex flex-wrap items-center justify-start w-full md:w-auto md:justify-end gap-2">
+                <span class="text-xs font-semibold text-gray-500 mr-2 uppercase tracking-wide hidden lg:inline">Filtros Rápidos:</span>
                 <button type="button" onclick="filtrarPorColor('todos')" id="btn-filtro-todos" class="filtro-btn active px-3 py-1.5 rounded-full text-xs font-bold border border-gray-300 bg-gray-800 text-white shadow-sm transition-all hover:bg-gray-700">Todos</button>
                 
                 <button type="button" onclick="filtrarPorColor('rojo')" id="btn-filtro-rojo" class="filtro-btn px-3 py-1.5 rounded-full text-xs font-bold border border-red-200 bg-white text-red-700 shadow-sm transition-all hover:bg-red-50 flex items-center gap-1">
@@ -243,6 +246,7 @@
         let metadatosGlobales = { 'enfoque': {}, 'cultura': {} };
         let datosActivos = null; // Jerarquía de actividades actuales
         let filtroActual = 'todos';
+        let tipoActivo = null; // Para saber qué dashboard estamos viendo y poder actualizarlo
 
         // 1. INICIALIZACIÓN: Cargar metadatos para las tarjetas al abrir
         window.onload = function() {
@@ -282,28 +286,25 @@
                     filaInicioTabla = i;
                 }
 
-                // Extraer pares clave-valor de forma más flexible
+                // Extraer pares clave-valor de forma más flexible y segura
                 fila.forEach((celda, idx) => {
                     if (typeof celda === 'string' && celda.trim() !== '') {
                         let celdaUpper = celda.toUpperCase().trim();
-                        // Intentar sacar el valor si está en la celda contigua
-                        let valorSiguiente = (fila[idx+1] && typeof fila[idx+1] === 'string') ? fila[idx+1].trim() : '';
+                        // Intentar sacar el valor si está en la celda contigua (idx+1) o tras los dos puntos (:)
+                        let valorSiguiente = (fila[idx+1] && typeof fila[idx+1] === 'string' && fila[idx+1].trim() !== '') ? fila[idx+1].trim() : null;
+                        
+                        // Función auxiliar para extraer el valor de forma robusta
+                        const extraerValor = (clave) => {
+                            if (valorSiguiente) return valorSiguiente;
+                            const partes = celda.split(':');
+                            return partes.length > 1 ? partes[1].trim() : '--';
+                        };
 
-                        if (celdaUpper.includes('GRUPO:')) {
-                            metadatos['Grupo'] = valorSiguiente || celda.split(':')[1]?.trim() || '--';
-                        }
-                        if (celdaUpper.includes('RESPONSABLE DEL PROYECTO:')) {
-                            metadatos['Responsable'] = valorSiguiente || celda.split(':')[1]?.trim() || '--';
-                        }
-                        if (celdaUpper.includes('NOMBRE DEL PROYECTO:')) {
-                            metadatos['Proyecto'] = valorSiguiente || celda.split(':')[1]?.trim() || '--';
-                        }
-                        if (celdaUpper.includes('EMERGENCIA:')) {
-                            metadatos['Emergencia'] = valorSiguiente || celda.split(':')[1]?.trim() || '--';
-                        }
-                        if (celdaUpper.includes('FECHA DE DILIGENCIAMIENTO:')) {
-                            metadatos['Fecha'] = valorSiguiente || celda.split(':')[1]?.trim() || '--';
-                        }
+                        if (celdaUpper.includes('GRUPO:')) metadatos['Grupo'] = extraerValor('GRUPO');
+                        if (celdaUpper.includes('RESPONSABLE DEL PROYECTO:')) metadatos['Responsable'] = extraerValor('RESPONSABLE DEL PROYECTO');
+                        if (celdaUpper.includes('NOMBRE DEL PROYECTO:')) metadatos['Proyecto'] = extraerValor('NOMBRE DEL PROYECTO');
+                        if (celdaUpper.includes('EMERGENCIA:')) metadatos['Emergencia'] = extraerValor('EMERGENCIA');
+                        if (celdaUpper.includes('FECHA DE DILIGENCIAMIENTO:')) metadatos['Fecha'] = extraerValor('FECHA DE DILIGENCIAMIENTO');
                     }
                 });
             }
@@ -364,12 +365,12 @@
                 if (nombreTarea !== "" && actividadActual !== null) {
                     actividadActual.tareas.push({
                         tarea: nombreTarea,
-                        progQ3_tarea: fila[2] || "-", // A veces se repite el número a nivel tarea
+                        progQ3_tarea: fila[2] || "-", 
                         progQ4_tarea: fila[3] || "-",
                         afectacionTarea: fila[4] || "",
                         afectacionMeta: fila[5] || "",
                         afectacionInd: fila[6] || "",
-                        indicadorAfectado: fila[7] || "No especificado",
+                        indicadorAfectado: fila[7] || "",
                         justificacion: fila[8] || "No aplica",
                         acciones: fila[9] || "No registra",
                         planContingencia: fila[10] || "No requiere"
@@ -397,6 +398,8 @@
                 alert("Los datos aún se están cargando o hubo un error de conexión.");
                 return;
             }
+            
+            tipoActivo = tipo; // Guardamos el tipo actual para el botón de actualizar
 
             // Ocultar inicio, mostrar dashboard
             document.getElementById('pantalla-inicio').classList.add('hidden');
@@ -419,15 +422,69 @@
             actualizarBotonesFiltro();
             document.getElementById('buscador').value = '';
             
-            calcularKPIs(); 
-            
+            calcularKPIs();
             renderizarJerarquia();
         }
 
         function volverAlInicio() {
+            tipoActivo = null;
             document.getElementById('pantalla-dashboard').classList.add('hidden');
             document.getElementById('nav-actions').classList.add('hidden');
             document.getElementById('pantalla-inicio').classList.remove('hidden');
+        }
+
+        // Función para actualizar datos sin salir del dashboard
+        function refrescarDatos() {
+            if (!tipoActivo) return;
+
+            // 1. UI: Mostrar estado de carga en el botón y en el contenedor
+            const icono = document.getElementById('icono-actualizar');
+            icono.classList.add('fa-spin');
+            
+            const contenedor = document.getElementById('contenedor-actividades');
+            contenedor.innerHTML = `
+                <div class="text-center py-20 text-gray-500">
+                    <i class="fas fa-sync-alt fa-spin text-3xl mb-3"></i>
+                    <p>Sincronizando con Google Sheets...</p>
+                </div>
+            `;
+
+            // 2. Evitar la caché del navegador añadiendo un timestamp a la URL
+            const urlFiel = URLS[tipoActivo] + '&t=' + new Date().getTime();
+
+            // 3. Volver a solicitar los datos en segundo plano
+            Papa.parse(urlFiel, {
+                download: true,
+                header: false,
+                encoding: "UTF-8",
+                complete: function(results) {
+                    // Reprocesar los datos crudos
+                    procesarEstructuraBase(tipoActivo, results.data);
+                    
+                    // Actualizar variables de la vista actual
+                    datosActivos = datosGlobales[tipoActivo];
+                    const meta = metadatosGlobales[tipoActivo];
+                    
+                    // Actualizar UI de la cabecera por si modificaste datos del proyecto
+                    document.getElementById('dash-proyecto').textContent = meta.Proyecto || 'Proyecto sin nombre';
+                    document.getElementById('dash-responsable').textContent = `Responsable: ${meta.Responsable || 'No asignado'}`;
+                    document.getElementById('dash-emergencia').textContent = meta.Emergencia || '--';
+                    document.getElementById('dash-fecha').textContent = meta.Fecha || '--/--/----';
+
+                    // Re-calcular KPIs y volver a pintar las tareas
+                    calcularKPIs();
+                    renderizarJerarquia();
+                    
+                    // Quitar estado de carga del botón
+                    icono.classList.remove('fa-spin');
+                },
+                error: function(err) {
+                    console.error("Error actualizando CSV", err);
+                    icono.classList.remove('fa-spin');
+                    alert("Error de conexión con Google Sheets al intentar actualizar.");
+                    renderizarJerarquia(); // Volver a mostrar lo que había si falla
+                }
+            });
         }
 
         // Función para calcular los resumenes estadísticos
@@ -540,11 +597,11 @@
                     <div class="p-5 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors" onclick="toggleAccordion('acordeon-${indexActividad}', 'icono-${indexActividad}')">
                         <div class="flex-1 pr-4">
                             <h3 class="text-lg font-bold text-gray-900 leading-snug">${actividad.nombre}</h3>
-                            <div class="mt-2 flex gap-4 text-sm text-gray-600">
-                                <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200"><i class="fas fa-bullseye text-gray-400"></i> Prog Q3: <strong class="text-gray-800">${actividad.progQ3}</strong></span>
-                                <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200"><i class="fas fa-bullseye text-gray-400"></i> Prog Q4: <strong class="text-gray-800">${actividad.progQ4}</strong></span>
-                                <span class="bg-blue-50 px-2 py-1 rounded border border-blue-100 text-blue-700"><i class="fas fa-sync-alt text-blue-400"></i> Reprog Q3: <strong>${actividad.reprogQ3}</strong></span>
-                                <span class="bg-blue-50 px-2 py-1 rounded border border-blue-100 text-blue-700"><i class="fas fa-sync-alt text-blue-400"></i> Reprog Q4: <strong>${actividad.reprogQ4}</strong></span>
+                            <div class="mt-2 flex flex-wrap gap-4 text-sm text-gray-600">
+                                <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200 whitespace-nowrap"><i class="fas fa-bullseye text-gray-400"></i> Prog Q3: <strong class="text-gray-800">${actividad.progQ3}</strong></span>
+                                <span class="bg-gray-100 px-2 py-1 rounded border border-gray-200 whitespace-nowrap"><i class="fas fa-bullseye text-gray-400"></i> Prog Q4: <strong class="text-gray-800">${actividad.progQ4}</strong></span>
+                                <span class="bg-blue-50 px-2 py-1 rounded border border-blue-100 text-blue-700 whitespace-nowrap"><i class="fas fa-sync-alt text-blue-400"></i> Reprog Q3: <strong>${actividad.reprogQ3}</strong></span>
+                                <span class="bg-blue-50 px-2 py-1 rounded border border-blue-100 text-blue-700 whitespace-nowrap"><i class="fas fa-sync-alt text-blue-400"></i> Reprog Q4: <strong>${actividad.reprogQ4}</strong></span>
                             </div>
                         </div>
                         <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0">
@@ -552,7 +609,7 @@
                         </div>
                     </div>
 
-                    <!-- Nivel 2: Contenedor de Tareas (Ahora como lista vertical con scroll) -->
+                    <!-- Nivel 2: Contenedor de Tareas (lista vertical con scroll si es necesario) -->
                     <div id="acordeon-${indexActividad}" class="accordion-content open bg-gray-50/50">
                         <div class="p-6 border-t border-gray-200">
                             <!-- Contenedor con límite de altura y scroll vertical -->
@@ -564,6 +621,10 @@
                     const semaforoTarea = clasificarSemaforoTarea(tarea.afectacionTarea);
                     const colorMeta = getColorBinario(tarea.afectacionMeta);
                     const colorInd = getColorBinario(tarea.afectacionInd);
+                    
+                    // Manejo seguro del indicador (Columna 7)
+                    const textoIndicador = (tarea.indicadorAfectado || '').trim();
+                    const mostrarIndicador = textoIndicador !== '' && textoIndicador !== 'No especificado';
 
                     html += `
                         <div class="border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-colors bg-white shadow-sm flex flex-col">
@@ -587,24 +648,23 @@
                                 <div class="p-3 rounded border ${colorInd} text-xs flex flex-col justify-center">
                                     <span class="font-bold uppercase opacity-75 text-[10px]">Afectación Indicador</span>
                                     <span class="font-medium mt-1">${tarea.afectacionInd || 'No registrado'}</span>
-                                    <!-- AQUI ESTÁ EL CAMBIO PARA MOSTRAR LA COLUMNA 7 -->
-                                    ${tarea.indicadorAfectado !== 'No especificado' && tarea.indicadorAfectado.trim() !== '' ? `<span class="italic mt-1.5 border-t border-current pt-1.5 block opacity-90">${tarea.indicadorAfectado}</span>` : ''}
+                                    ${mostrarIndicador ? `<span class="italic mt-1.5 border-t border-current pt-1.5 block opacity-90">${textoIndicador}</span>` : ''}
                                 </div>
                             </div>
 
-                            <!-- Nivel 3: Detalle Cualitativo -->
+                            <!-- Nivel 3: Detalle Cualitativo (apilado en móvil, 3 columnas en escritorio) -->
                             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-auto pt-4 border-t border-gray-100 flex-1">
                                 <div class="text-xs flex flex-col">
                                     <span class="font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1 mb-2"><i class="fas fa-comment-dots text-gray-400"></i> Justificación</span>
-                                    <p class="text-gray-700 bg-gray-50 p-2.5 rounded h-full">${tarea.justificacion}</p>
+                                    <p class="text-gray-700 bg-gray-50 p-2.5 rounded h-full break-words whitespace-pre-wrap">${tarea.justificacion}</p>
                                 </div>
                                 <div class="text-xs flex flex-col">
                                     <span class="font-bold text-blue-500 uppercase tracking-wide flex items-center gap-1 mb-2"><i class="fas fa-hammer text-blue-400"></i> Acciones Ejecutadas</span>
-                                    <p class="text-gray-700 bg-blue-50/50 p-2.5 rounded border border-blue-100 h-full">${tarea.acciones}</p>
+                                    <p class="text-gray-700 bg-blue-50/50 p-2.5 rounded border border-blue-100 h-full break-words whitespace-pre-wrap">${tarea.acciones}</p>
                                 </div>
                                 <div class="text-xs flex flex-col">
                                     <span class="font-bold text-orange-500 uppercase tracking-wide flex items-center gap-1 mb-2"><i class="fas fa-shield-alt text-orange-400"></i> Plan Contingencia</span>
-                                    <p class="text-gray-700 bg-orange-50/50 p-2.5 rounded border border-orange-100 h-full">${tarea.planContingencia}</p>
+                                    <p class="text-gray-700 bg-orange-50/50 p-2.5 rounded border border-orange-100 h-full break-words whitespace-pre-wrap">${tarea.planContingencia}</p>
                                 </div>
                             </div>
                         </div>
