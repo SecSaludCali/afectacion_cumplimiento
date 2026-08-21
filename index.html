@@ -304,8 +304,9 @@
             let jerarquia = [];
             let actividadActual = null;
             
-            // Empezar a leer desde la fila SIGUIENTE a los encabezados, saltando la fila 8 (que tiene los textos explicativos)
-            for (let i = filaInicioTabla + 2; i < filas.length; i++) {
+<comment-tag id="1">            // Empezar a leer desde la fila SIGUIENTE a los encabezados, saltando la fila 8 (que tiene los textos explicativos)
+            for (let i = filaInicioTabla + 2; i < filas.length; i++) {</comment-tag id="1" text="                // Empezar a leer directamente desde la fila SIGUIENTE a los encabezados (fila + 1)
+                for (let i = filaInicioTabla + 1; i < filas.length; i++) {" type="suggestion">
                 let fila = filas[i];
                 
                 // Ignorar filas totalmente vacías
