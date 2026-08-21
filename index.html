@@ -587,7 +587,8 @@
                                 <div class="p-3 rounded border ${colorInd} text-xs flex flex-col justify-center">
                                     <span class="font-bold uppercase opacity-75 text-[10px]">Afectación Indicador</span>
                                     <span class="font-medium mt-1">${tarea.afectacionInd || 'No registrado'}</span>
-                                    ${tarea.indicadorAfectado !== 'No especificado' && tarea.afectacionInd.toLowerCase().includes('si') ? `<span class="italic mt-1.5 border-t border-current pt-1.5 block opacity-90">${tarea.indicadorAfectado}</span>` : ''}
+                                    <!-- AQUI ESTÁ EL CAMBIO PARA MOSTRAR LA COLUMNA 7 -->
+                                    ${tarea.indicadorAfectado !== 'No especificado' && tarea.indicadorAfectado.trim() !== '' ? `<span class="italic mt-1.5 border-t border-current pt-1.5 block opacity-90">${tarea.indicadorAfectado}</span>` : ''}
                                 </div>
                             </div>
 
