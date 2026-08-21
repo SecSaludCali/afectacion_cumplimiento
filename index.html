@@ -135,7 +135,7 @@
             <!-- Contexto del Proyecto -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-wrap gap-6 items-center justify-between">
                 <div>
-                    <h2 id="metaProyecto" class="text-2xl font-extrabold text-gray-900 leading-tight">Nombre del Proyecto</h2>
+                    <h2 id="metaProyecto" class="text-2xl font-extrabold text-gray-900 leading-tight">Cargando...</h2>
                     <p id="metaSubsecretaria" class="text-sm text-gray-500 flex items-center gap-2 mt-1">
                         <i class="fas fa-sitemap"></i> Subsecretaría...
                     </p>
@@ -143,7 +143,7 @@
                 <div class="flex gap-6 border-l border-gray-200 pl-6">
                     <div>
                         <p class="text-xs text-gray-400 uppercase font-semibold tracking-wider">Emergencia</p>
-                        <p id="metaEmergencia" class="font-medium text-gray-800">No especificada</p>
+                        <p id="metaEmergencia" class="font-medium text-gray-800">--</p>
                     </div>
                     <div>
                         <p class="text-xs text-gray-400 uppercase font-semibold tracking-wider">Fecha Reporte</p>
@@ -159,7 +159,7 @@
                         <i class="fas fa-list-check"></i>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500 font-medium">Total Tareas Evaluadas</p>
+                        <p class="text-sm text-gray-500 font-medium">Total Tareas</p>
                         <p id="kpiTotal" class="text-2xl font-bold text-gray-900">0</p>
                     </div>
                 </div>
@@ -172,7 +172,7 @@
                         <p class="text-sm text-gray-500 font-medium">Afectación Alta</p>
                         <div class="flex items-baseline gap-2">
                             <p id="kpiAfectacionAlta" class="text-2xl font-bold text-red-600">0</p>
-                            <p class="text-xs text-gray-400">tareas detenidas</p>
+                            <p class="text-xs text-gray-400">tareas</p>
                         </div>
                     </div>
                 </div>
@@ -182,23 +182,23 @@
                         <i class="fas fa-bullseye"></i>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500 font-medium">Impacto en Metas</p>
+                        <p class="text-sm text-gray-500 font-medium">Metas Afectadas</p>
                         <div class="flex items-baseline gap-2">
                             <p id="kpiMetasAfectadas" class="text-2xl font-bold text-gray-900">0</p>
-                            <p class="text-xs text-gray-400">tareas afectan metas</p>
+                            <p class="text-xs text-gray-400">tareas</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center gap-4 border-b-4 border-b-red-500">
                     <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-xl">
                         <i class="fas fa-chart-line"></i>
                     </div>
                     <div>
-                        <p class="text-sm text-gray-500 font-medium">Impacto Indicadores</p>
+                        <p class="text-sm text-gray-500 font-medium">Ind. Afectados</p>
                         <div class="flex items-baseline gap-2">
                             <p id="kpiIndicadoresAfectados" class="text-2xl font-bold text-gray-900">0</p>
-                            <p class="text-xs text-gray-400">tareas afectan ind.</p>
+                            <p class="text-xs text-gray-400">tareas</p>
                         </div>
                     </div>
                 </div>
@@ -207,9 +207,8 @@
             <!-- Layout Principal: Gráficos + Listado -->
             <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 
-                <!-- Columna Izquierda: Gráficos y Filtros -->
+                <!-- Columna Izquierda: Filtros -->
                 <div class="xl:col-span-1 space-y-6">
-                    <!-- Filtros -->
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                         <h3 class="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
                             <i class="fas fa-filter text-gray-400"></i> Filtros Rápidos
@@ -226,6 +225,9 @@
                             </button>
                             <button onclick="setFilter('metas-afectadas')" id="btn-filter-metas-afectadas" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent">
                                 Metas Afectadas
+                            </button>
+                            <button onclick="setFilter('indicadores-afectados')" id="btn-filter-indicadores-afectados" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent">
+                                Indicadores Afectados
                             </button>
                         </div>
                     </div>
@@ -251,20 +253,16 @@
         // Variables Globales
         let rawData = [];
         let parsedTasks = [];
-        let groupedData = {}; // Nueva variable para agrupar por actividad
+        let groupedData = {}; 
         let currentFilter = 'all';
-        let chartInstance = null;
 
-        // Configuración Inicial con la URL proporcionada
+        // Configuración Inicial
         const DEFAULT_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR-A_QjLWSri4tam1_5359GJotzRd40HTRgjwBtbrDYYREcZdoUWWlVvhJHkC6-R0AOo9i_50s9FyaR/pub?output=csv';
-        
-        // Al iniciar, cargamos los datos de la URL por defecto si no hay una en local storage
         const savedUrl = localStorage.getItem('sheetsUrl');
         const urlToLoad = savedUrl || DEFAULT_URL;
         
         document.getElementById('sheetsUrl').value = urlToLoad;
         
-        // Iniciar carga automáticamente
         window.addEventListener('DOMContentLoaded', (event) => {
              loadDataFromGoogleSheets(urlToLoad);
         });
@@ -294,14 +292,14 @@
             showLoading(true);
             Papa.parse(url, {
                 download: true,
-                header: false, // Leemos crudo para manejar los metadatos primero
+                header: false, 
                 complete: function(results) {
                     rawData = results.data;
                     processData(rawData);
                 },
                 error: function(err) {
                     showLoading(false);
-                    alert("Error al cargar los datos. Verifica que la URL sea un CSV público válido de Google Sheets.\nDetalles: " + err);
+                    alert("Error al cargar los datos. Verifica que la URL sea un CSV público válido.\nDetalles: " + err);
                     document.getElementById('emptyState').style.display = 'block';
                 }
             });
@@ -310,96 +308,119 @@
         function processData(data) {
             if (!data || data.length === 0) return;
 
-            let headerRowIndex = -1;
+            // Extraer Metadatos (Filas 1 a 11 aproximadamente en el formato original)
             let metadata = { proyecto: '', subsecretaria: '', emergencia: '', fecha: '' };
+            let tableStartIndex = -1;
 
-            // 1. Extraer Metadatos y encontrar cabecera real
-            for (let i = 0; i < Math.min(20, data.length); i++) {
+            // Buscar la fila de encabezados de la tabla principal.
+            // Asumimos que la tabla principal comienza donde encontramos '1. ACTIVIDAD' o '2. TAREA'
+            for (let i = 0; i < data.length; i++) {
                 const row = data[i];
+                if (!row) continue;
                 
-                // Buscamos una fila que tenga al menos dos de estas palabras clave para asegurarnos que es la cabecera
-                let matchCount = 0;
-                if (row.some(cell => typeof cell === 'string' && cell.trim() === '1. ACTIVIDAD')) matchCount++;
-                if (row.some(cell => typeof cell === 'string' && cell.trim() === '2. TAREA')) matchCount++;
-                if (row.some(cell => typeof cell === 'string' && cell.includes('3. CANTIDAD PROGRAMADA'))) matchCount++;
-                if (row.some(cell => typeof cell === 'string' && cell.includes('4. NIVEL DE AFECTACIÓN'))) matchCount++;
-
-                if (matchCount >= 2) {
-                    headerRowIndex = i;
-                }
-
+                // Recolectar metadatos en las primeras filas
                 row.forEach((cell, idx) => {
                     if (typeof cell === 'string') {
-                        if (cell.includes('NOMBRE DEL PROYECTO:')) metadata.proyecto = row[idx + 1] || 'No definido';
-                        if (cell.includes('SUBSECRETARÍA')) metadata.subsecretaria = cell;
-                        if (cell.includes('EMERGENCIA:')) metadata.emergencia = row[idx + 1] || 'No definido';
-                        if (cell.includes('FECHA DE DILIGENCIAMIENTO:') || cell.includes('FECHA:')) metadata.fecha = row[idx + 1] || 'No definido';
+                        let upperCell = cell.toUpperCase().trim();
+                        if (upperCell.includes('NOMBRE DEL PROYECTO:')) metadata.proyecto = row[idx + 1] || '';
+                        if (upperCell.includes('SUBSECRETARÍA')) metadata.subsecretaria = cell;
+                        if (upperCell.includes('EMERGENCIA:')) metadata.emergencia = row[idx + 1] || '';
+                        if (upperCell.includes('FECHA DE DILIGENCIAMIENTO:') || upperCell.includes('FECHA:')) metadata.fecha = row[idx + 1] || '';
                     }
                 });
-                
-                if (headerRowIndex !== -1) break;
+
+                // Detectar inicio de tabla
+                if (row.some(cell => typeof cell === 'string' && (cell.includes('1. ACTIVIDAD') || cell.includes('2. TAREA')))) {
+                    tableStartIndex = i;
+                    break;
+                }
             }
 
-            if (headerRowIndex === -1) {
+            if (tableStartIndex === -1) {
                 showLoading(false);
-                alert("No se pudo identificar la tabla de datos principal. Asegúrate de que los encabezados sigan el formato numérico (e.g., '1. ACTIVIDAD', '2. TAREA').");
+                alert("No se pudo identificar el inicio de la tabla (encabezados '1. ACTIVIDAD' o '2. TAREA').");
                 return;
             }
 
-            document.getElementById('metaProyecto').textContent = metadata.proyecto || 'Proyecto sin nombre';
-            document.getElementById('metaSubsecretaria').innerHTML = `<i class="fas fa-sitemap"></i> ${metadata.subsecretaria || 'Dependencia no especificada'}`;
-            document.getElementById('metaEmergencia').textContent = metadata.emergencia || '--';
-            document.getElementById('metaFecha').textContent = metadata.fecha || '--';
+            // Actualizar UI con metadatos
+            document.getElementById('metaProyecto').textContent = metadata.proyecto || 'Proyecto no especificado';
+            document.getElementById('metaSubsecretaria').innerHTML = `<i class="fas fa-sitemap"></i> ${metadata.subsecretaria || 'Subsecretaría no especificada'}`;
+            document.getElementById('metaEmergencia').textContent = metadata.emergencia || 'No especificada';
+            document.getElementById('metaFecha').textContent = metadata.fecha || '--/--/----';
 
-            // 2. Procesar Filas de Tareas (ASIGNACIÓN ESTRICTA DE COLUMNAS)
-            const headers = data[headerRowIndex].map(h => typeof h === 'string' ? h.trim().toUpperCase() : '');
+            // Extraer las 13 columnas de la tabla principal
+            // La fila de encabezados real suele estar en tableStartIndex, pero las columnas exactas 
+            // a veces están combinadas o en una segunda fila. Asumiremos los índices basados en la estructura estándar de 13 columnas.
             
-            // Asignamos los índices EXACTAMENTE como indicaste (0-indexed)
-            const idxActividad = 0;      // Columna #1: Actividad
-            const idxTarea = 1;          // Columna #2: Tarea
-            const idxCantQ3 = 2;         // Columna #3: Cantidad (Q3)
-            const idxCantQ4 = 3;         // Columna #3.1: Cantidad (Q4)
-            const idxSemaforo1 = 4;      // Columna #4: Nivel de Afectación
-            const idxSemaforo2 = 5;      // Columna #5: Afectación Meta
-            const idxSemaforo3 = 6;      // Columna #6: Afectación Indicador
-            const idxJustificacion = 7;  // Columna #7: Justificación
-            const idxAcciones = 8;       // Columna #8: Acciones
-            const idxContingencia = 9;   // Columna #9: Plan de Contingencia
-
+            // Índices esperados de las 13 columnas:
+            // 0: 1. ACTIVIDAD
+            // 1: 2. TAREA
+            // 2: MAGNITUD PROGRAMADA TERCER TRIMESTRE
+            // 3: MAGNITUD PROGRAMADA CUARTO TRIMESTRE
+            // 4: MAGNITUD EJECUTADA A LA FECHA
+            // 5: MAGNITUD PENDIENTE DE EJECUCIÓN
+            // 6: 4. NIVEL DE AFECTACIÓN DE LA TAREA
+            // 7: 5. LA AFECTACIÓN DE LA TAREA IMPACTA EL CUMPLIMIENTO DE LA META
+            // 8: 6. LA AFECTACIÓN DE LA TAREA IMPACTA EL CUMPLIMIENTO DE INDICADORES
+            // 9: JUSTIFICACIÓN / OBSERVACIONES
+            // 10: ACCIONES EJECUTADAS / MITIGACIÓN
+            // 11: PLAN DE CONTINGENCIA
+            // 12: ESTADO (o similar) / DEPENDENCIAS
+            
+            // Nota: Mapearemos a los 13 índices exactos, ignorando filas vacías o de instrucciones
             parsedTasks = [];
-            let lastActividad = "Actividad General"; // Para arrastrar el nombre de la actividad si la celda está vacía
-
-            const dataRows = data.slice(headerRowIndex + 1);
+            let lastActividad = "Sin Actividad Definida";
             
-            dataRows.forEach((row, i) => {
+            // Empezamos a leer desde la fila siguiente a los encabezados
+            // Si hay filas combinadas de cabecera, podríamos saltarlas (por ej +2), aquí saltamos +1
+            const dataRows = data.slice(tableStartIndex + 1);
+            
+            dataRows.forEach((row, index) => {
+                // Si la fila está completamente vacía (o casi), la saltamos
                 if (!row.some(cell => typeof cell === 'string' && cell.trim() !== '')) return;
                 
-                const tarea = row[idxTarea] || '';
-                const afect = row[idxSemaforo1] || '';
-                
-                // Evitamos procesar filas que parecen ser sub-encabezados largos
-                if (tarea.includes('NIVEL DE AFECTACIÓN (SEMÁFORO DESPLEGABLE)')) return;
+                // Evitamos filas que parezcan instrucciones o sub-encabezados largos
+                if (row[0] && row[0].toString().includes("Instrucciones:")) return;
+                if (row[1] && row[1].toString().includes("SEMÁFORO DESPLEGABLE")) return;
 
-                // Si hay tarea pero no afectación, o viceversa, la registramos igual si parece válida
-                if(tarea.trim() === '' && afect.trim() === '') return;
+                // Las 13 Columnas
+                const colActividad = row[0] || '';
+                const colTarea = row[1] || '';
+                const colMagProgQ3 = row[2] || '';
+                const colMagProgQ4 = row[3] || '';
+                const colMagEjec = row[4] || '';
+                const colMagPend = row[5] || '';
+                const colNivelAfect = row[6] || '';
+                const colAfectMeta = row[7] || '';
+                const colAfectInd = row[8] || '';
+                const colJustificacion = row[9] || '';
+                const colAcciones = row[10] || '';
+                const colPlanCont = row[11] || '';
+                const colTrece = row[12] || ''; // Columna extra si la hay (ej. Responsable/Estado)
 
-                // Si la celda de actividad tiene texto, la actualizamos. Si está vacía, asume la última conocida (común en Sheets combinados)
-                if (row[idxActividad] && row[idxActividad].trim() !== '') {
-                    lastActividad = row[idxActividad].trim();
+                // Si hay tarea pero no afectación o viceversa, y no parece un encabezado, lo tomamos
+                if (colTarea.trim() === '' && colNivelAfect.trim() === '') return;
+
+                // Arrastrar el nombre de la actividad si la celda está combinada o vacía
+                if (colActividad && colActividad.trim() !== '') {
+                    lastActividad = colActividad.trim();
                 }
 
                 parsedTasks.push({
-                    id: i,
+                    id: index,
                     actividad: lastActividad,
-                    tarea: tarea,
-                    cantQ3: row[idxCantQ3] || 'N/A',
-                    cantQ4: row[idxCantQ4] || 'N/A',
-                    afectacionTarea: afect,
-                    afectacionMeta: row[idxSemaforo2] || '',
-                    afectacionIndicador: row[idxSemaforo3] || '',
-                    justificacion: row[idxJustificacion] || 'Sin registro',
-                    acciones: row[idxAcciones] || 'Sin registro',
-                    contingencia: row[idxContingencia] || 'Sin registro'
+                    tarea: colTarea.trim(),
+                    magProgQ3: colMagProgQ3,
+                    magProgQ4: colMagProgQ4,
+                    magEjec: colMagEjec,
+                    magPend: colMagPend,
+                    afectacionTarea: colNivelAfect.trim(),
+                    afectacionMeta: colAfectMeta.trim(),
+                    afectacionIndicador: colAfectInd.trim(),
+                    justificacion: colJustificacion,
+                    acciones: colAcciones,
+                    contingencia: colPlanCont,
+                    columna13: colTrece
                 });
             });
 
@@ -431,8 +452,7 @@
         function setFilter(filterId) {
             currentFilter = filterId;
             
-            // Actualizar UI de botones
-            const buttons = ['all', 'afectacion-alta', 'afectacion-parcial', 'metas-afectadas'];
+            const buttons = ['all', 'afectacion-alta', 'afectacion-parcial', 'metas-afectadas', 'indicadores-afectados'];
             buttons.forEach(id => {
                 const btn = document.getElementById(`btn-filter-${id}`);
                 if (id === filterId) {
@@ -446,7 +466,7 @@
         }
 
         function getBadgeInfo(text, type) {
-            const t = (text || '').toLowerCase();
+            const t = (text || '').toLowerCase().trim();
             if (!t) return { color: 'bg-gray-100 text-gray-500 border-gray-200', icon: 'fa-minus', text: 'No Evaluado' };
 
             if (type === 'tarea') {
@@ -463,7 +483,6 @@
             return { color: 'bg-gray-100 text-gray-700 border-gray-200', icon: 'fa-info-circle', text: text };
         }
 
-                // Extraer metadatos basándonos en tu estructura
         function toggleActivity(id) {
             const content = document.getElementById(`act-content-${id}`);
             const icon = document.getElementById(`act-icon-${id}`);
@@ -482,7 +501,6 @@
             const container = document.getElementById('cardsContainer');
             container.innerHTML = '';
 
-            // 1. Filtrar los datos planos
             let filteredTasks = parsedTasks;
             if (currentFilter === 'afectacion-alta') {
                 filteredTasks = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta'));
@@ -490,6 +508,8 @@
                 filteredTasks = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('parcial'));
             } else if (currentFilter === 'metas-afectadas') {
                 filteredTasks = parsedTasks.filter(t => (t.afectacionMeta || '').toLowerCase().includes('si afecta'));
+            } else if (currentFilter === 'indicadores-afectados') {
+                filteredTasks = parsedTasks.filter(t => (t.afectacionIndicador || '').toLowerCase().includes('si afecta'));
             }
 
             document.getElementById('tareasCount').textContent = `${filteredTasks.length} tareas en esta vista`;
@@ -504,7 +524,6 @@
                 return;
             }
 
-            // 2. Agrupar las tareas filtradas por Actividad
             groupedData = {};
             filteredTasks.forEach(task => {
                 if(!groupedData[task.actividad]) {
@@ -513,45 +532,21 @@
                 groupedData[task.actividad].push(task);
             });
 
-            // 3. Renderizar Jerárquicamente
             let actIndex = 0;
             for (const [actividadNombre, tareas] of Object.entries(groupedData)) {
                 actIndex++;
                 
-                // Calcular resumen de la actividad para el encabezado
                 const numAlta = tareas.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta')).length;
                 let badgeAlert = '';
                 if(numAlta > 0) {
                     badgeAlert = `<span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full"><i class="fas fa-exclamation-circle"></i> ${numAlta} en riesgo</span>`;
                 }
 
-                // Sumar cantidades de tareas para la actividad general
-                let totalQ3 = 0;
-                let totalQ4 = 0;
-                let validQ3 = false;
-                let validQ4 = false;
-
-                tareas.forEach(t => {
-                    if (!isNaN(parseFloat(t.cantQ3))) {
-                        totalQ3 += parseFloat(t.cantQ3);
-                        validQ3 = true;
-                    }
-                    if (!isNaN(parseFloat(t.cantQ4))) {
-                        totalQ4 += parseFloat(t.cantQ4);
-                        validQ4 = true;
-                    }
-                });
-
-                const displayTotalQ3 = validQ3 ? totalQ3 : 'N/A';
-                const displayTotalQ4 = validQ4 ? totalQ4 : 'N/A';
-
-                // Crear Acordeón de Actividad
                 const actCard = document.createElement('div');
                 actCard.className = "bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden";
                 
                 let tareasHTML = '';
                 
-                // Renderizar Tareas dentro de la Actividad
                 tareas.forEach(task => {
                     const infoTarea = getBadgeInfo(task.afectacionTarea, 'tarea');
                     const infoMeta = getBadgeInfo(task.afectacionMeta, 'meta');
@@ -583,15 +578,23 @@
                                     </div>
                                 </div>
 
-                                <!-- Cantidades Programadas -->
-                                <div class="flex flex-row lg:flex-col gap-2 lg:gap-1 shrink-0 bg-blue-50/50 p-2 rounded border border-blue-100/50">
-                                    <div class="text-[11px]">
-                                        <span class="text-gray-500 font-medium">Prog. III Tri:</span> 
-                                        <span class="font-bold text-gray-800">${task.cantQ3}</span>
+                                <!-- Magnitudes (4 columnas) -->
+                                <div class="flex flex-wrap lg:flex-nowrap gap-2 shrink-0">
+                                    <div class="bg-blue-50/50 p-2 rounded border border-blue-100/50 min-w-[70px]">
+                                        <div class="text-[10px] text-gray-500 font-medium">Prog. Q3</div>
+                                        <div class="font-bold text-gray-800 text-xs">${task.magProgQ3 || '-'}</div>
                                     </div>
-                                    <div class="text-[11px]">
-                                        <span class="text-gray-500 font-medium">Prog. IV Tri:</span> 
-                                        <span class="font-bold text-gray-800">${task.cantQ4}</span>
+                                    <div class="bg-blue-50/50 p-2 rounded border border-blue-100/50 min-w-[70px]">
+                                        <div class="text-[10px] text-gray-500 font-medium">Prog. Q4</div>
+                                        <div class="font-bold text-gray-800 text-xs">${task.magProgQ4 || '-'}</div>
+                                    </div>
+                                    <div class="bg-gray-50 p-2 rounded border border-gray-200 min-w-[70px]">
+                                        <div class="text-[10px] text-gray-500 font-medium">Ejecutado</div>
+                                        <div class="font-bold text-gray-800 text-xs">${task.magEjec || '-'}</div>
+                                    </div>
+                                    <div class="bg-gray-50 p-2 rounded border border-gray-200 min-w-[70px]">
+                                        <div class="text-[10px] text-gray-500 font-medium">Pendiente</div>
+                                        <div class="font-bold text-gray-800 text-xs">${task.magPend || '-'}</div>
                                     </div>
                                 </div>
                                 
@@ -602,18 +605,18 @@
 
                             <!-- Detalles Expandibles (Textos Largos) -->
                             <div id="content-${task.id}" class="card-details bg-white">
-                                <div class="p-4 pl-6 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm border-t border-dashed border-gray-200 mx-4">
+                                <div class="p-4 pl-6 grid grid-cols-1 md:grid-cols-3 gap-6 text-sm border-t border-dashed border-gray-200 mx-4 bg-gray-50 rounded-b-lg">
                                     <div>
-                                        <h5 class="font-bold text-gray-700 mb-1 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-comment-alt text-gray-400"></i> Justificación</h5>
-                                        <p class="text-gray-600 leading-relaxed text-xs">${task.justificacion}</p>
+                                        <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-comment-alt text-gray-400"></i> Justificación / Observaciones</h5>
+                                        <p class="text-gray-600 leading-relaxed text-xs bg-white p-2 border border-gray-100 rounded h-full">${task.justificacion || '<i class="text-gray-400">Sin registro</i>'}</p>
                                     </div>
                                     <div>
-                                        <h5 class="font-bold text-gray-700 mb-1 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-tools text-gray-400"></i> Acciones Ejecutadas</h5>
-                                        <p class="text-gray-600 leading-relaxed text-xs">${task.acciones}</p>
+                                        <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-tools text-gray-400"></i> Acciones / Mitigación</h5>
+                                        <p class="text-gray-600 leading-relaxed text-xs bg-white p-2 border border-gray-100 rounded h-full">${task.acciones || '<i class="text-gray-400">Sin registro</i>'}</p>
                                     </div>
                                     <div>
-                                        <h5 class="font-bold text-gray-700 mb-1 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-map-signs text-gray-400"></i> Plan Contingencia</h5>
-                                        <p class="text-gray-600 leading-relaxed text-xs">${task.contingencia}</p>
+                                        <h5 class="font-bold text-gray-700 mb-2 flex items-center gap-1.5 text-xs uppercase"><i class="fas fa-map-signs text-gray-400"></i> Plan de Contingencia</h5>
+                                        <p class="text-gray-600 leading-relaxed text-xs bg-white p-2 border border-gray-100 rounded h-full">${task.contingencia || '<i class="text-gray-400">Sin registro</i>'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -632,25 +635,12 @@
                             </div>
                         </div>
                         <div class="flex items-center gap-4 shrink-0">
-                            <!-- Totales de la Actividad -->
-                            <div class="flex gap-3 bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
-                                <div class="text-center">
-                                    <span class="block text-[10px] text-gray-500 font-bold uppercase">Total Q3</span>
-                                    <span class="block text-sm font-bold text-gray-800">${displayTotalQ3}</span>
-                                </div>
-                                <div class="w-px bg-gray-200"></div>
-                                <div class="text-center">
-                                    <span class="block text-[10px] text-gray-500 font-bold uppercase">Total Q4</span>
-                                    <span class="block text-sm font-bold text-gray-800">${displayTotalQ4}</span>
-                                </div>
-                            </div>
                             <div class="text-gray-500 bg-white p-2 rounded-full shadow-sm ml-2">
                                 <i class="fas fa-chevron-down icon-transition" id="act-icon-${actIndex}"></i>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Contenedor de Tareas (Abierto por defecto) -->
                     <div id="act-content-${actIndex}" class="block">
                         ${tareasHTML}
                     </div>
