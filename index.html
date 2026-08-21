@@ -208,6 +208,29 @@
             <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 
                 <!-- Columna Izquierda: Gráficos y Filtros -->
+                <div class="xl:col-span-1 space-y-6">
+                    <!-- Filtros -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                        <h3 class="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <i class="fas fa-filter text-gray-400"></i> Filtros Rápidos
+                        </h3>
+                        <div class="space-y-3">
+                            <button onclick="setFilter('all')" id="btn-filter-all" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors bg-blue-50 text-blue-700 ring-1 ring-blue-600/20">
+                                Todas las Tareas
+                            </button>
+                            <button onclick="setFilter('afectacion-alta')" id="btn-filter-afectacion-alta" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent">
+                                Afectación Alta
+                            </button>
+                            <button onclick="setFilter('afectacion-parcial')" id="btn-filter-afectacion-parcial" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent">
+                                Afectación Parcial
+                            </button>
+                            <button onclick="setFilter('metas-afectadas')" id="btn-filter-metas-afectadas" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent">
+                                Metas Afectadas
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Columna Derecha: Tarjetas de Tareas Agrupadas -->
                 <div class="xl:col-span-2">
                     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-4 flex justify-between items-center">
@@ -391,6 +414,41 @@
             updateDashboard();
         }
 
+        function updateDashboard() {
+            updateKPIs();
+            renderCards();
+        }
+
+        function updateKPIs() {
+            document.getElementById('kpiTotal').textContent = parsedTasks.length;
+            
+            const altas = parsedTasks.filter(t => (t.afectacionTarea || '').toLowerCase().includes('alta')).length;
+            document.getElementById('kpiAfectacionAlta').textContent = altas;
+            
+            const metas = parsedTasks.filter(t => (t.afectacionMeta || '').toLowerCase().includes('si afecta')).length;
+            document.getElementById('kpiMetasAfectadas').textContent = metas;
+            
+            const indicadores = parsedTasks.filter(t => (t.afectacionIndicador || '').toLowerCase().includes('si afecta')).length;
+            document.getElementById('kpiIndicadoresAfectados').textContent = indicadores;
+        }
+
+        function setFilter(filterId) {
+            currentFilter = filterId;
+            
+            // Actualizar UI de botones
+            const buttons = ['all', 'afectacion-alta', 'afectacion-parcial', 'metas-afectadas'];
+            buttons.forEach(id => {
+                const btn = document.getElementById(`btn-filter-${id}`);
+                if (id === filterId) {
+                    btn.className = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors bg-blue-50 text-blue-700 ring-1 ring-blue-600/20";
+                } else {
+                    btn.className = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-50 text-gray-700 hover:text-gray-900 border border-transparent";
+                }
+            });
+
+            renderCards();
+        }
+
         function getBadgeInfo(text, type) {
             const t = (text || '').toLowerCase();
             if (!t) return { color: 'bg-gray-100 text-gray-500 border-gray-200', icon: 'fa-minus', text: 'No Evaluado' };
@@ -471,6 +529,26 @@
                     badgeAlert = `<span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full"><i class="fas fa-exclamation-circle"></i> ${numAlta} en riesgo</span>`;
                 }
 
+                // Sumar cantidades de tareas para la actividad general
+                let totalQ3 = 0;
+                let totalQ4 = 0;
+                let validQ3 = false;
+                let validQ4 = false;
+
+                tareas.forEach(t => {
+                    if (!isNaN(parseFloat(t.cantQ3))) {
+                        totalQ3 += parseFloat(t.cantQ3);
+                        validQ3 = true;
+                    }
+                    if (!isNaN(parseFloat(t.cantQ4))) {
+                        totalQ4 += parseFloat(t.cantQ4);
+                        validQ4 = true;
+                    }
+                });
+
+                const displayTotalQ3 = validQ3 ? totalQ3 : 'N/A';
+                const displayTotalQ4 = validQ4 ? totalQ4 : 'N/A';
+
                 // Crear Acordeón de Actividad
                 const actCard = document.createElement('div');
                 actCard.className = "bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden";
@@ -521,7 +599,7 @@
                                     </div>
                                 </div>
                                 
-                                <div class="text-gray-400 shrink-0 self-end lg:self-center">
+                                <div class="text-gray-400 shrink-0 self-end lg:self-center ml-2">
                                     <i class="fas fa-chevron-down icon-transition" id="icon-${task.id}"></i>
                                 </div>
                             </div>
@@ -548,17 +626,31 @@
                 });
 
                 actCard.innerHTML = `
-                    <div class="bg-gray-50 p-4 border-b border-gray-200 cursor-pointer flex justify-between items-center hover:bg-gray-100 transition-colors" onclick="toggleActivity(${actIndex})">
-                        <div class="pr-4">
+                    <div class="bg-gray-50 p-4 border-b border-gray-200 cursor-pointer flex flex-col sm:flex-row justify-between sm:items-center hover:bg-gray-100 transition-colors gap-4" onclick="toggleActivity(${actIndex})">
+                        <div class="flex-grow pr-4">
                             <span class="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest mb-1 block">ACTIVIDAD</span>
                             <h3 class="text-base font-bold text-gray-900 leading-tight">${actividadNombre}</h3>
-                            <div class="mt-2 flex gap-2">
+                            <div class="mt-2 flex flex-wrap gap-2 items-center">
                                 <span class="bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded">${tareas.length} Tareas</span>
                                 ${badgeAlert}
                             </div>
                         </div>
-                        <div class="text-gray-500 bg-white p-2 rounded-full shadow-sm">
-                            <i class="fas fa-chevron-down icon-transition" id="act-icon-${actIndex}"></i>
+                        <div class="flex items-center gap-4 shrink-0">
+                            <!-- Totales de la Actividad -->
+                            <div class="flex gap-3 bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
+                                <div class="text-center">
+                                    <span class="block text-[10px] text-gray-500 font-bold uppercase">Total Q3</span>
+                                    <span class="block text-sm font-bold text-gray-800">${displayTotalQ3}</span>
+                                </div>
+                                <div class="w-px bg-gray-200"></div>
+                                <div class="text-center">
+                                    <span class="block text-[10px] text-gray-500 font-bold uppercase">Total Q4</span>
+                                    <span class="block text-sm font-bold text-gray-800">${displayTotalQ4}</span>
+                                </div>
+                            </div>
+                            <div class="text-gray-500 bg-white p-2 rounded-full shadow-sm ml-2">
+                                <i class="fas fa-chevron-down icon-transition" id="act-icon-${actIndex}"></i>
+                            </div>
                         </div>
                     </div>
                     
